@@ -1,0 +1,320 @@
+import { Component, ElementRef, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AudioService } from '../core/audio.service';
+import { TPipe } from '../core/i18n';
+import { JUZ_START, QuranService, Surah, SurahContent, TAFSIRS, TRANSLATIONS } from '../core/quran.service';
+import { SettingsService } from '../core/settings.service';
+import { ToastService } from '../core/toast.service';
+import { UserDataService } from '../core/user-data.service';
+import { EmptyComponent, HeaderComponent, SheetComponent, SkeletonComponent } from '../shared/ui';
+
+@Component({
+  selector: 'app-quran-list',
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, EmptyComponent],
+  template: `
+    <app-header [title]="'quran' | t" />
+    <div class="pad">
+      <div class="search-box mb-3"><i class="bi bi-search"></i>
+        <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search surah by name or number" /></div>
+
+      <div class="seg mb-3">
+        <button [class.active]="tab() === 'surah'" (click)="tab.set('surah')">{{ 'surah' | t }}</button>
+        <button [class.active]="tab() === 'juz'" (click)="tab.set('juz')">{{ 'juz' | t }}</button>
+        <button [class.active]="tab() === 'bm'" (click)="tab.set('bm')">{{ 'bookmarks' | t }}</button>
+      </div>
+
+      @if (ud.lastRead(); as lr) {
+        @if (tab() === 'surah' && !q()) {
+          <a [routerLink]="['/quran', lr.surah]" [queryParams]="{ ayah: lr.ayah }" class="card-i d-flex align-items-center gap-3 mb-3 text-decoration-none">
+            <i class="bi bi-bookmark-star-fill fs-3 text-warning"></i>
+            <div class="flex-grow-1 text-body"><div class="small text-secondary">{{ 'lastRead' | t }}</div>
+              <div class="fw-semibold">{{ lr.name }} · Ayah {{ lr.ayah }}</div></div>
+            <i class="bi bi-chevron-right chev text-secondary"></i>
+          </a>
+        }
+      }
+
+      @if (tab() === 'surah') {
+        @if (loading()) { <app-skeleton [n]="10" /> }
+        @else if (error()) { <div class="error-box">{{ error() }} <button class="btn btn-sm btn-outline-danger ms-2" (click)="load()">{{ 'retry' | t }}</button></div> }
+        @else {
+          <div class="list-i">
+            @for (s of filtered(); track s.number) {
+              <a class="row-i" [routerLink]="['/quran', s.number]">
+                <div class="num-badge">{{ s.number }}</div>
+                <div class="grow">
+                  <div class="t">{{ s.englishName }}</div>
+                  <div class="s">{{ s.englishNameTranslation }} · {{ s.numberOfAyahs }} ayahs · {{ s.revelationType }}</div>
+                </div>
+                <div class="arabic-plain fs-5">{{ s.name.replace('سُورَةُ ', '') }}</div>
+              </a>
+            } @empty { <app-empty icon="search" [text]="'noResults' | t" /> }
+          </div>
+        }
+      } @else if (tab() === 'juz') {
+        <div class="list-i">
+          @for (j of juz; track j.juz) {
+            <a class="row-i" [routerLink]="['/quran', j.surah]" [queryParams]="{ ayah: j.ayah }">
+              <div class="num-badge">{{ j.juz }}</div>
+              <div class="grow"><div class="t">{{ 'juz' | t }} {{ j.juz }}</div><div class="s">Starts at {{ surahName(j.surah) }} {{ j.surah }}:{{ j.ayah }}</div></div>
+              <i class="bi bi-chevron-right chev"></i>
+            </a>
+          }
+        </div>
+      } @else {
+        <div class="list-i">
+          @for (b of qBookmarks(); track b.id) {
+            <a class="row-i" [routerLink]="b.link.split('?')[0]" [queryParams]="params(b.link)">
+              <div class="ic"><i class="bi bi-bookmark-fill"></i></div>
+              <div class="grow"><div class="t">{{ b.title }}</div><div class="s">{{ b.subtitle }}</div></div>
+            </a>
+          } @empty { <app-empty icon="bookmark" text="No Quran bookmarks yet. Tap the bookmark icon on any ayah." /> }
+        </div>
+      }
+    </div>`,
+})
+export class QuranListPage {
+  private quran = inject(QuranService);
+  ud = inject(UserDataService);
+  tab = signal<'surah' | 'juz' | 'bm'>('surah');
+  q = signal('');
+  surahs = signal<Surah[]>([]);
+  loading = signal(true);
+  error = signal('');
+  juz = JUZ_START;
+  filtered = computed(() => {
+    const q = this.q().trim().toLowerCase();
+    if (!q) return this.surahs();
+    return this.surahs().filter(s => String(s.number) === q || s.englishName.toLowerCase().includes(q) ||
+      s.englishNameTranslation.toLowerCase().includes(q) || s.name.includes(q));
+  });
+  qBookmarks = computed(() => this.ud.bookmarks().filter(b => b.type === 'quran'));
+
+  constructor() { this.load(); }
+  async load() {
+    this.loading.set(true); this.error.set('');
+    try { this.surahs.set(await this.quran.getSurahs()); }
+    catch { this.error.set('Could not load the surah list. Check your connection.'); }
+    this.loading.set(false);
+  }
+  surahName(n: number) { return this.surahs()[n - 1]?.englishName ?? 'Surah'; }
+  params(link: string) { const q = link.split('?')[1]; return q ? Object.fromEntries(new URLSearchParams(q)) : {}; }
+}
+
+@Component({
+  selector: 'app-quran-reader',
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, SheetComponent],
+  template: `
+    <app-header [title]="data()?.surah?.englishName ?? ('quran' | t)" [hasActions]="true">
+      <button class="icon-btn" (click)="playSurah()" aria-label="Play surah"><i class="bi bi-play-circle"></i></button>
+      <button class="icon-btn" (click)="sheet.set('settings')" aria-label="Reader settings"><i class="bi bi-sliders"></i></button>
+    </app-header>
+
+    @if (loading()) { <div class="pad"><app-skeleton [n]="6" [h]="110" /></div> }
+    @else if (error()) { <div class="pad"><div class="error-box">{{ error() }} <button class="btn btn-sm btn-outline-danger ms-2" (click)="load()">{{ 'retry' | t }}</button></div></div> }
+    @else { @if (data(); as d) {
+      <div class="surah-head">
+        <div class="small opacity-75">{{ d.surah.revelationType }} · {{ d.surah.numberOfAyahs }} ayahs · {{ 'juz' | t }} {{ d.arabic[0].juz }}</div>
+        <div class="arabic-plain fs-3">{{ d.surah.name }}</div>
+        <div>{{ d.surah.englishNameTranslation }}</div>
+      </div>
+      @if (n() !== 1 && n() !== 9) { <div class="arabic text-center fs-3 py-3 bsm">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div> }
+
+      <div class="ayahs">
+        @for (a of d.arabic; track a.numberInSurah; let i = $index) {
+          <div class="ayah" [id]="'a' + a.numberInSurah" [class.playing]="playing() === a.numberInSurah">
+            <div class="d-flex align-items-center mb-2 gap-1">
+              <span class="chip">{{ n() }}:{{ a.numberInSurah }}</span>
+              <span class="flex-grow-1"></span>
+              <button class="icon-btn sm" (click)="playAyah(a.numberInSurah, a.number)" aria-label="Play ayah"><i class="bi" [class]="playing() === a.numberInSurah ? 'bi-pause-circle-fill' : 'bi-play-circle'"></i></button>
+              <button class="icon-btn sm" [class.on]="isBm(a.numberInSurah)" (click)="toggleBm(a.numberInSurah)" aria-label="Bookmark"><i class="bi" [class]="isBm(a.numberInSurah) ? 'bi-bookmark-fill' : 'bi-bookmark'"></i></button>
+              <button class="icon-btn sm" (click)="openMenu(a.numberInSurah)" aria-label="More"><i class="bi bi-three-dots-vertical"></i></button>
+            </div>
+            <div class="arabic" [style.font-size.px]="s.s().arabicSize">{{ text(a.numberInSurah, a.text) }}<span class="ayah-end">{{ a.numberInSurah }}</span></div>
+            @if (s.s().showTranslit && d.translit[i]) { <div class="translit">{{ d.translit[i].text }}</div> }
+            @if (s.s().showTranslation && d.translation[i]) {
+              <div class="trans" [dir]="transDir()" [style.font-size.px]="s.s().transSize">{{ d.translation[i].text }}</div>
+            }
+          </div>
+        }
+      </div>
+      <div class="d-flex gap-2 p-3">
+        @if (n() > 1) { <a class="btn-i outline sm flex-fill text-center" [routerLink]="['/quran', n() - 1]">‹ {{ 'back' | t }}</a> }
+        @if (n() < 114) { <a class="btn-i sm flex-fill text-center" [routerLink]="['/quran', n() + 1]">{{ 'next' | t }} ›</a> }
+      </div>
+    } }
+
+    @if (sheet() === 'settings') {
+      <app-sheet (closed)="sheet.set('')">
+        <h6 class="mb-3">Reader settings</h6>
+        <label class="small text-secondary">Arabic size: {{ s.s().arabicSize }}px</label>
+        <input type="range" class="form-range" min="22" max="52" [ngModel]="s.s().arabicSize" (ngModelChange)="s.patch({ arabicSize: +$event })" />
+        <label class="small text-secondary">Translation size: {{ s.s().transSize }}px</label>
+        <input type="range" class="form-range" min="12" max="26" [ngModel]="s.s().transSize" (ngModelChange)="s.patch({ transSize: +$event })" />
+        <div class="form-check form-switch my-2"><input class="form-check-input" type="checkbox" id="tr" [ngModel]="s.s().showTranslation" (ngModelChange)="s.patch({ showTranslation: $event })" /><label class="form-check-label" for="tr">Show translation</label></div>
+        <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="tl" [ngModel]="s.s().showTranslit" (ngModelChange)="s.patch({ showTranslit: $event })" /><label class="form-check-label" for="tl">Show transliteration</label></div>
+        <label class="small text-secondary">Translation</label>
+        <select class="form-select" [ngModel]="s.s().translation" (ngModelChange)="changeTranslation($event)">
+          @for (t of translations; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+        </select>
+      </app-sheet>
+    }
+    @if (sheet() === 'menu' && sel()) {
+      <app-sheet (closed)="sheet.set('')">
+        <div class="fw-semibold mb-2">{{ data()?.surah?.englishName }} {{ n() }}:{{ sel() }}</div>
+        <div class="list-i">
+          <button class="row-i" (click)="openTafsir()"><div class="ic"><i class="bi bi-book-half"></i></div><div class="grow t">Tafseer</div></button>
+          <button class="row-i" (click)="addNote()"><div class="ic"><i class="bi bi-journal-plus"></i></div><div class="grow t">Add note</div></button>
+          <button class="row-i" (click)="copy()"><div class="ic"><i class="bi bi-clipboard"></i></div><div class="grow t">{{ 'copy' | t }}</div></button>
+          <button class="row-i" (click)="share()"><div class="ic"><i class="bi bi-share"></i></div><div class="grow t">{{ 'share' | t }}</div></button>
+          <button class="row-i" (click)="setLast()"><div class="ic"><i class="bi bi-flag"></i></div><div class="grow t">Mark as last read</div></button>
+        </div>
+      </app-sheet>
+    }
+    @if (sheet() === 'tafsir') {
+      <app-sheet (closed)="sheet.set('')">
+        <h6>Tafseer · {{ n() }}:{{ sel() }}</h6>
+        <select class="form-select mb-3" [ngModel]="tafsirId()" (ngModelChange)="tafsirId.set($event); loadTafsir()">
+          @for (t of tafsirs; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+        </select>
+        @if (tafsirText() === null) { <div class="skeleton" style="height:120px"></div> }
+        @else { <div class="arabic-plain fs-5">{{ tafsirText() }}</div> }
+      </app-sheet>
+    }`,
+  styles: [`
+    .surah-head { background: linear-gradient(160deg, var(--g-700), var(--g-900)); color: #fff; text-align: center; padding: 18px 16px; }
+    .bsm { color: var(--g-700); }
+    .ayah { padding: 14px 16px; border-bottom: 1px solid var(--line); transition: background .3s; }
+    .ayah.playing { background: var(--g-100); }
+    .icon-btn.sm { width: 32px; height: 32px; font-size: 17px; }
+    .translit { color: var(--g-700); font-style: italic; margin-top: 6px; font-size: 14px; }
+    .trans { margin-top: 8px; color: var(--text); opacity: .9; line-height: 1.6; }
+  `],
+})
+export class QuranReaderPage implements OnDestroy {
+  private quran = inject(QuranService);
+  private route = inject(ActivatedRoute);
+  private audio = inject(AudioService);
+  private toast = inject(ToastService);
+  private el = inject(ElementRef);
+  private router = inject(Router);
+  s = inject(SettingsService);
+  ud = inject(UserDataService);
+
+  translations = TRANSLATIONS;
+  tafsirs = TAFSIRS;
+  n = signal(1);
+  data = signal<SurahContent | null>(null);
+  loading = signal(true);
+  error = signal('');
+  sheet = signal<'' | 'settings' | 'menu' | 'tafsir'>('');
+  sel = signal(0);
+  playing = signal(0);
+  tafsirId = signal('ar.jalalayn');
+  tafsirText = signal<string | null>(null);
+  transDir = computed(() => TRANSLATIONS.find(t => t.id === this.s.s().translation)?.dir ?? 'ltr');
+  private ayahAudio = new Audio();
+  private scrollTo = 0;
+
+  constructor() {
+    this.route.paramMap.subscribe(p => { this.n.set(+(p.get('n') ?? 1)); this.load(); });
+    this.route.queryParamMap.subscribe(q => this.scrollTo = +(q.get('ayah') ?? 0));
+    this.ayahAudio.addEventListener('ended', () => this.nextAyah());
+    this.ayahAudio.addEventListener('error', () => { this.playing.set(0); this.toast.show('Unable to play audio. Check your connection.'); });
+  }
+
+  async load() {
+    this.loading.set(true); this.error.set(''); this.stopAyah();
+    try {
+      this.data.set(await this.quran.getSurah(this.n(), this.s.s().translation));
+      this.loading.set(false);
+      setTimeout(() => this.scroll(), 50);
+    } catch { this.error.set('Could not load this surah. Check your connection.'); this.loading.set(false); }
+  }
+
+  private scroll() {
+    if (!this.scrollTo) return;
+    (this.el.nativeElement as HTMLElement).querySelector(`#a${this.scrollTo}`)?.scrollIntoView({ block: 'start' });
+    this.setLastAt(this.scrollTo);
+  }
+
+  /** Strip the Bismillah prefix that the API embeds in the first ayah of most surahs. */
+  text(num: number, t: string): string {
+    t = t.replace(/﻿/g, '');
+    if (num === 1 && this.n() !== 1 && this.n() !== 9) {
+      const words = t.split(' ');
+      return words.slice(4).join(' ') || t;
+    }
+    return t;
+  }
+
+  changeTranslation(id: string) { this.s.patch({ translation: id }); this.load(); }
+
+  private ayahText(num: number) {
+    const d = this.data()!;
+    const i = num - 1;
+    return { ar: this.text(num, d.arabic[i].text), tr: d.translation[i]?.text ?? '' };
+  }
+  private ref(num: number) { return `${this.data()!.surah.englishName} ${this.n()}:${num}`; }
+
+  isBm(num: number) { return this.ud.isBookmarked(`q-${this.n()}-${num}`); }
+  toggleBm(num: number) {
+    const t = this.ayahText(num);
+    const on = this.ud.toggleBookmark({
+      id: `q-${this.n()}-${num}`, type: 'quran', title: this.ref(num), subtitle: `${this.data()!.surah.name}`,
+      arabic: t.ar, text: t.tr, link: `/quran/${this.n()}?ayah=${num}`,
+    });
+    this.toast.show(on ? 'Bookmark added' : 'Bookmark removed');
+  }
+
+  openMenu(num: number) { this.sel.set(num); this.sheet.set('menu'); }
+  copy() { const t = this.ayahText(this.sel()); navigator.clipboard?.writeText(`${t.ar}\n\n${t.tr}\n— ${this.ref(this.sel())}`); this.toast.show('Copied'); this.sheet.set(''); }
+  share() {
+    const t = this.ayahText(this.sel());
+    const text = `${t.ar}\n\n${t.tr}\n— ${this.ref(this.sel())}`;
+    if (navigator.share) navigator.share({ title: 'Islam 360', text }).catch(() => {}); else { navigator.clipboard?.writeText(text); this.toast.show('Copied'); }
+    this.sheet.set('');
+  }
+  addNote() {
+    const num = this.sel();
+    const t = this.ayahText(num);
+    this.ud.saveNote({ title: `Note on ${this.ref(num)}`, body: `${t.ar}\n${t.tr}\n\n`, ref: this.ref(num), link: `/quran/${this.n()}?ayah=${num}` });
+    this.sheet.set(''); this.router.navigateByUrl('/notes');
+  }
+  setLast() { this.setLastAt(this.sel()); this.toast.show('Marked as last read'); this.sheet.set(''); }
+  private setLastAt(num: number) { this.ud.setLastRead({ surah: this.n(), ayah: num, name: this.data()!.surah.englishName }); }
+
+  openTafsir() { this.sheet.set('tafsir'); this.loadTafsir(); }
+  async loadTafsir() {
+    this.tafsirText.set(null);
+    try { this.tafsirText.set(await this.quran.tafsir(this.n(), this.sel(), this.tafsirId())); }
+    catch { this.tafsirText.set('Tafseer could not be loaded. Check your connection.'); }
+  }
+
+  playSurah() {
+    const d = this.data(); if (!d) return;
+    this.stopAyah();
+    this.audio.play(d.surah);
+    this.toast.show('Playing surah recitation');
+  }
+
+  playAyah(num: number, globalNum: number) {
+    if (this.playing() === num) { this.stopAyah(); return; }
+    this.audio.stop();
+    this.playing.set(num);
+    this.ayahAudio.src = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalNum}.mp3`;
+    this.ayahAudio.play().catch(() => {});
+  }
+  private nextAyah() {
+    const d = this.data(); const cur = this.playing();
+    if (!d || !cur || cur >= d.arabic.length) { this.playing.set(0); return; }
+    const a = d.arabic[cur];
+    this.playing.set(a.numberInSurah);
+    this.ayahAudio.src = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${a.number}.mp3`;
+    this.ayahAudio.play().catch(() => {});
+    (this.el.nativeElement as HTMLElement).querySelector(`#a${a.numberInSurah}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  private stopAyah() { this.ayahAudio.pause(); this.playing.set(0); }
+  ngOnDestroy() { this.stopAyah(); }
+}
