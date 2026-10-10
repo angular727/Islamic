@@ -41,6 +41,13 @@ Bottom-nav tab with five guides: Prayer (Namaz), Fasting (Roza), Hajj, Umrah and
 - Progress, checklists, the Ramadan tracker and bookmarks are stored on the device and included in Backup.
 - `npm test` runs data-integrity tests (needs Chrome; set `CHROME_BIN` if it is not on the default path).
 
+## Install on a phone (PWA)
+
+- Build: `npm run build`, then host `dist/islam360/browser` on any **https** site (Vercel config included in `vercel.json`).
+- Android (Chrome): menu > Install app, or More > Install app inside Islam 360. iPhone (Safari): Share > Add to Home Screen.
+- Once installed it opens full-screen with its own icon and works offline (service worker is active in production builds only).
+- Icons are in `public/icons`; app name and colours are in `public/manifest.webmanifest`; caching rules are in `ngsw-config.json`.
+
 ## Data sources
 
 - Quran text, translations, transliteration, tafseer, search: AlQuran Cloud API (cached in IndexedDB; downloadable from More → Downloads)

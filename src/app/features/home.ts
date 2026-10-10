@@ -6,7 +6,8 @@ import { PrayerService } from '../core/prayer.service';
 import { SettingsService } from '../core/settings.service';
 import { UserDataService } from '../core/user-data.service';
 import { toHijri, HIJRI_MONTHS } from '../core/hijri';
-import { HeaderComponent } from '../shared/ui';
+import { InstallService } from '../core/install.service';
+import { HeaderComponent, SheetComponent } from '../shared/ui';
 
 interface Tile { link: string; icon: string; key: string }
 export const TILES: Tile[] = [
@@ -157,7 +158,7 @@ export class LibraryPage {
 
 @Component({
   selector: 'app-more',
-  imports: [RouterLink, TPipe, HeaderComponent],
+  imports: [RouterLink, TPipe, HeaderComponent, SheetComponent],
   template: `
     <app-header [title]="'more' | t" [back]="false" />
     <div class="pad">
@@ -180,12 +181,44 @@ export class LibraryPage {
             <i class="bi bi-chevron-right chev"></i>
           </a>
         }
+        @if (!inst.installed()) {
+          <button class="row-i" (click)="install()">
+            <div class="ic"><i class="bi bi-phone"></i></div>
+            <div class="grow"><div class="t">Install app</div><div class="s">Add Islam 360 to your home screen</div></div>
+            <i class="bi bi-download chev"></i>
+          </button>
+        }
         <button class="row-i" (click)="share()">
           <div class="ic"><i class="bi bi-share"></i></div><div class="grow t">{{ 'share' | t }} Islam 360</div></button>
       </div>
-    </div>`,
+    </div>
+    @if (help()) {
+      <app-sheet (closed)="help.set(false)">
+        <h6>Install Islam 360</h6>
+        @if (inst.ios) {
+          <ol class="mb-0 ps-3">
+            <li class="mb-2">Open this page in <b>Safari</b>.</li>
+            <li class="mb-2">Tap the <b>Share</b> button <i class="bi bi-box-arrow-up"></i>.</li>
+            <li class="mb-2">Choose <b>Add to Home Screen</b>, then tap <b>Add</b>.</li>
+          </ol>
+        } @else {
+          <ol class="mb-0 ps-3">
+            <li class="mb-2">Open this page in <b>Chrome</b> (or Edge).</li>
+            <li class="mb-2">Tap the menu <b>⋮</b> at the top right.</li>
+            <li class="mb-2">Choose <b>Install app</b> or <b>Add to Home screen</b>.</li>
+          </ol>
+        }
+        <p class="small text-secondary mt-3 mb-0">Installing needs the app to be opened from a secure (https) address. After installing, it opens full-screen and works offline.</p>
+      </app-sheet>
+    }`,
 })
 export class MorePage {
+  inst = inject(InstallService);
+  help = signal(false);
+  async install() {
+    if (this.inst.canInstall()) await this.inst.install();
+    else this.help.set(true);
+  }
   learn = [
     { link: '/names', icon: 'stars', key: 'names', sub: 'The 99 beautiful names of Allah' },
     { link: '/duas', icon: 'hand-thumbs-up', key: 'duas', sub: 'Daily, morning & evening and occasion duas' },
