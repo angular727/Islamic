@@ -78,7 +78,7 @@ export class HadithBooksPage {
         <div class="search-box mb-3"><i class="bi bi-search"></i>
           <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search in this chapter" /></div>
         @for (h of filtered(); track h.number) {
-          <div class="card-i mb-3">
+          <div class="card-i mb-3" translate="no">
             <div class="d-flex align-items-center mb-2">
               <span class="chip">#{{ h.number }}</span>
               @for (g of h.grades; track g.name) { <span class="chip gold ms-1">{{ g.grade }}</span> }
@@ -136,5 +136,5 @@ export class HadithListPage {
   }
   private fmt(h: Hadith) { return [h.arabic, h.text, `— ${h.reference}`].filter(Boolean).join('\n\n'); }
   copy(h: Hadith) { navigator.clipboard?.writeText(this.fmt(h)); this.toast.show('Copied'); }
-  share(h: Hadith) { navigator.share ? navigator.share({ title: 'Islam 360', text: this.fmt(h) }).catch(() => {}) : this.copy(h); }
+  share(h: Hadith) { navigator.share ? navigator.share({ title: 'Islam', text: this.fmt(h) }).catch(() => {}) : this.copy(h); }
 }

@@ -23,7 +23,7 @@ const initials = (n: string) => n.split(' ').filter(w => !/^(al|abdul)/i.test(w)
         @for (r of reciters; track r.id) {
           <a class="row-i" [routerLink]="['/audio', r.id]">
             <div class="avatar">{{ ini(r.name) }}</div>
-            <div class="grow"><div class="t">{{ r.name }}</div><div class="s arabic-plain" style="line-height:1.5">{{ r.arabic }}</div></div>
+            <div class="grow"><div class="t" translate="no">{{ r.name }}</div><div class="s arabic-plain" style="line-height:1.5">{{ r.arabic }}</div></div>
             <i class="bi bi-chevron-right chev"></i>
           </a>
         }
@@ -52,7 +52,7 @@ export class RecitersPage { reciters = RECITERS; ini = initials; }
             <div class="row-i" [class.now]="audio.surah()?.number === s.number && audio.reciter().id === reciter.id">
               <button class="grow d-flex align-items-center gap-3 border-0 bg-transparent p-0 text-start" (click)="play(s)">
                 <div class="num-badge">{{ s.number }}</div>
-                <div class="grow"><div class="t">{{ s.englishName }}</div><div class="s">{{ s.englishNameTranslation }} · {{ s.numberOfAyahs }} ayahs</div></div>
+                <div class="grow"><div class="t" translate="no">{{ s.englishName }}</div><div class="s">{{ s.englishNameTranslation }} · {{ s.numberOfAyahs }} ayahs</div></div>
               </button>
               @if (dl()[s.number] === 'busy') { <span class="spinner-border spinner-border-sm text-success"></span> }
               @else if (dl()[s.number] === 'done') { <button class="icon-btn text-success" (click)="rm(s)" aria-label="Remove download"><i class="bi bi-check-circle-fill"></i></button> }

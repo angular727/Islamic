@@ -1,11 +1,16 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { LANGS, Lang, TPipe } from '../core/i18n';
+import { TPipe } from '../core/i18n';
+import { DomTranslator } from '../core/dom-translator.service';
+import { LanguageService } from '../core/language.service';
+import { flag } from '../core/lang-utils';
+import { ToastService } from '../core/toast.service';
+import { TranslateService } from '../core/translate.service';
 import { LocationService } from '../core/location.service';
 import { Madhab, SettingsService } from '../core/settings.service';
-import { HeaderComponent } from '../shared/ui';
+import { HeaderComponent, SkeletonComponent } from '../shared/ui';
 
 @Component({
   selector: 'app-splash',
@@ -14,7 +19,7 @@ import { HeaderComponent } from '../shared/ui';
     <div class="hero justify-content-between text-center">
       <div></div>
       <div>
-        <div class="logo-mark"><i class="bi bi-moon-stars-fill crescent"></i><span class="word">Islam</span><span class="num">360</span></div>
+        <div class="logo-mark"><i class="bi bi-moon-stars-fill crescent"></i><span class="word">Islam</span></div>
         <p class="mt-4 opacity-75 small">{{ 'tagline' | t }}</p>
       </div>
       <button class="btn-i light" (click)="go()">{{ 'getStarted' | t }}</button>
@@ -57,27 +62,119 @@ export class OnboardingPage {
 
 @Component({
   selector: 'app-language',
-  imports: [HeaderComponent, TPipe],
+  imports: [FormsModule, HeaderComponent, TPipe, SkeletonComponent],
   template: `
     <app-header [title]="'selectLanguage' | t" [back]="s.s().onboarded" />
     <div class="pad">
-      <div class="list-i">
-        @for (l of langs; track l.code) {
-          <button class="row-i" (click)="pick(l.code)">
-            <div class="grow t">{{ l.label }}</div>
-            @if (s.s().lang === l.code) { <i class="bi bi-check-circle-fill text-success fs-5"></i> } @else { <i class="bi bi-chevron-right chev"></i> }
-          </button>
-        }
+      <div class="card-i d-flex align-items-center gap-3 mb-3" translate="no">
+        <div class="flex-grow-1 min-w-0">
+          <div class="native" [attr.lang]="langs.current().code" [dir]="langs.current().rtl ? 'rtl' : 'ltr'">{{ langs.current().native }}</div>
+          <div class="small text-secondary">{{ langs.current().name }} · {{ langs.current().code }}</div>
+        </div>
+        <i class="bi bi-check-circle-fill text-success fs-4"></i>
       </div>
+
+      @if (langs.error()) {
+        <div class="error-box mb-3 small">{{ langs.error() }} <button class="btn btn-sm btn-outline-danger ms-2" (click)="langs.load(true)">{{ 'retry' | t }}</button></div>
+      }
+      @if (tr.unavailable() && !tr.isSource()) {
+        <div class="error-box mb-3 small">The translation service could not be reached, so some text is shown in English. <button class="btn btn-sm btn-outline-danger ms-2" (click)="retry()">{{ 'retry' | t }}</button></div>
+      }
+
+      <div class="seg mb-3">
+        <button [class.active]="tab() === 'all'" (click)="tab.set('all'); country.set(null)">All languages</button>
+        <button [class.active]="tab() === 'country'" (click)="tab.set('country')">By country</button>
+      </div>
+
+      @if (!langs.languages().length) { <app-skeleton [n]="8" [h]="52" /> }
+      @else {
+        @if (tab() === 'country' && !country()) {
+          <div class="search-box mb-2"><i class="bi bi-search"></i>
+            <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search countries" aria-label="Search countries" /></div>
+          <div class="small text-secondary mb-2">Pick a country to see its languages. You can still choose any language, whatever country you are in.</div>
+          <div class="list-i" translate="no">
+            @for (c of countryList(); track c.code) {
+              <button class="row-i" (click)="country.set(c); q.set('')">
+                <span class="fs-4">{{ flag(c.code) }}</span>
+                <div class="grow"><div class="t">{{ c.name }}</div><div class="s">{{ c.count }} language{{ c.count === 1 ? '' : 's' }}</div></div>
+                <i class="bi bi-chevron-right chev"></i>
+              </button>
+            } @empty { <div class="row-i text-secondary small">No country matches.</div> }
+          </div>
+        } @else {
+          @if (country(); as c) {
+            <button class="btn btn-link p-0 mb-2" (click)="country.set(null)"><i class="bi bi-chevron-left"></i> <span translate="no">{{ c.name }}</span></button>
+          } @else {
+            <div class="search-box mb-2"><i class="bi bi-search"></i>
+              <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search languages" aria-label="Search languages" /></div>
+          }
+          <div class="list-i" translate="no" role="listbox" aria-label="Languages">
+            @for (l of shown(); track l.code) {
+              <button class="row-i" role="option" [attr.aria-selected]="l.code === s.s().lang" (click)="pick(l.code)">
+                <div class="grow">
+                  <div class="native" [attr.lang]="l.code" [dir]="l.rtl ? 'rtl' : 'ltr'">{{ l.native }}</div>
+                  <div class="s">{{ l.name }} · {{ l.code }}</div>
+                </div>
+                @if (s.s().lang === l.code) { <i class="bi bi-check-circle-fill text-success fs-5"></i> }
+              </button>
+            } @empty { <div class="row-i text-secondary small">{{ 'noResults' | t }}</div> }
+          </div>
+        }
+      }
+
+      <div class="card-i mt-3">
+        <div class="form-check form-switch mb-1">
+          <input class="form-check-input" type="checkbox" id="tc" [ngModel]="s.s().translateContent" (ngModelChange)="s.patch({ translateContent: $event })" />
+          <label class="form-check-label fw-semibold" for="tc">Translate lesson text too</label>
+        </div>
+        <div class="small text-secondary">Menus, buttons and messages are always translated. Quran, Hadith and Dua texts are never machine-translated. Turn this on to also machine-translate the Ibadaat lessons; machine translation can contain errors.</div>
+      </div>
+
       <button class="btn-i mt-4" (click)="done()">{{ 'continue' | t }}</button>
     </div>`,
+  styles: [`
+    .native { font-weight: 600; font-size: 17px; line-height: 1.6; }
+    .native[dir='rtl'] { text-align: start; font-family: 'Noto Naskh Arabic', 'Noto Nastaliq Urdu', 'Inter', sans-serif; }
+    .min-w-0 { min-width: 0; }
+  `],
 })
 export class LanguagePage {
   s = inject(SettingsService);
+  langs = inject(LanguageService);
+  tr = inject(TranslateService);
+  private dom = inject(DomTranslator);
   private r = inject(Router);
   private loc = inject(Location);
-  langs = LANGS;
-  pick(code: Lang) { this.s.patch({ lang: code }); }
+  private toast = inject(ToastService);
+  flag = flag;
+  tab = signal<'all' | 'country'>('all');
+  q = signal('');
+  country = signal<{ code: string; name: string; languages: string[] } | null>(null);
+
+  constructor() { this.langs.load(); }
+
+  /** Languages matching the search (all of them, or the selected country's). */
+  shown = computed(() => {
+    const q = this.q().trim().toLowerCase();
+    const c = this.country();
+    const list = c ? this.langs.languages().filter(l => c.languages.includes(l.code) || l.code.endsWith('-' + c.code)) : this.langs.languages();
+    return q ? list.filter(l => (l.name + ' ' + l.native + ' ' + l.code).toLowerCase().includes(q)) : list;
+  });
+
+  countryList = computed(() => {
+    const q = this.q().trim().toLowerCase();
+    return this.langs.countries().filter(c => c.languages.length && (!q || c.name.toLowerCase().includes(q)))
+      .map(c => ({ ...c, count: c.languages.length })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  async pick(code: string) {
+    const ok = await this.langs.select(code);
+    const l = this.langs.current();
+    this.toast.show(ok ? l.native : 'This language is not supported yet. Showing English.');
+  }
+
+  retry() { this.tr.retry(); this.dom.refresh(); }
+
   done() { this.s.s().onboarded ? this.loc.back() : this.r.navigateByUrl('/madhab'); }
 }
 

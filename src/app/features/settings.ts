@@ -3,11 +3,13 @@ import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AudioService } from '../core/audio.service';
-import { LANGS, TPipe } from '../core/i18n';
+import { TPipe } from '../core/i18n';
+import { LanguageService } from '../core/language.service';
 import { LocationService } from '../core/location.service';
 import { NotifyService } from '../core/notify.service';
 import { METHODS } from '../core/prayer.service';
 import { QuranService, TRANSLATIONS } from '../core/quran.service';
+import { TranslationPickerComponent } from '../shared/translation-picker';
 import { AzanMode, PRAYERS, SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
 import { UserDataService } from '../core/user-data.service';
@@ -45,7 +47,7 @@ export class ThemesPage {
 
 @Component({
   selector: 'app-settings',
-  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SheetComponent],
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SheetComponent, TranslationPickerComponent],
   template: `
     <app-header [title]="'settings' | t" />
     <div class="pad">
@@ -92,7 +94,7 @@ export class ThemesPage {
           <button class="btn-i outline sm flex-fill" (click)="askPerm()"><i class="bi bi-bell"></i> {{ notify.permission === 'granted' ? 'Enabled' : 'Allow' }}</button>
           <button class="btn-i outline sm flex-fill" (click)="notify.test()">Test sound</button>
         </div>
-        <div class="small text-secondary mt-2">Alerts fire while Islam 360 is open in your browser.</div>
+        <div class="small text-secondary mt-2">Alerts fire while Islam is open in your browser.</div>
       </div>
 
       <div class="section-title">General</div>
@@ -104,10 +106,8 @@ export class ThemesPage {
 
       <div class="section-title">Quran preferences</div>
       <div class="card-i">
-        <label class="small text-secondary">Translation</label>
-        <select class="form-select mb-3" [ngModel]="s.s().translation" (ngModelChange)="s.patch({ translation: $event })">
-          @for (t of translations; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
-        </select>
+        <label class="small text-secondary mb-1">Translation</label>
+        <div class="mb-3"><app-translation-picker /></div>
         <label class="small text-secondary">Arabic size: {{ s.s().arabicSize }}px</label>
         <input type="range" class="form-range" min="22" max="52" [ngModel]="s.s().arabicSize" (ngModelChange)="s.patch({ arabicSize: +$event })" />
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="st" [ngModel]="s.s().showTranslation" (ngModelChange)="s.patch({ showTranslation: $event })" /><label class="form-check-label" for="st">Show translation</label></div>
@@ -156,7 +156,8 @@ export class SettingsPage {
   translations = TRANSLATIONS;
   sheet = signal<'' | 'pin' | 'clear'>('');
   pin = '';
-  langLabel = computed(() => LANGS.find(l => l.code === this.s.s().lang)?.label);
+  private languages = inject(LanguageService);
+  langLabel = computed(() => this.languages.current().native);
 
   adjust(k: (typeof PRAYERS)[number], v: number) { this.s.patch({ adjustments: { ...this.s.s().adjustments, [k]: Math.max(-30, Math.min(30, +v || 0)) } }); }
   setAzan(k: (typeof PRAYERS)[number], v: AzanMode) { this.s.patch({ azan: { ...this.s.s().azan, [k]: v } }); }
@@ -166,7 +167,7 @@ export class SettingsPage {
   backup() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([this.ud.export()], { type: 'application/json' }));
-    a.download = 'islam360-backup.json'; a.click(); URL.revokeObjectURL(a.href);
+    a.download = 'islam-backup.json'; a.click(); URL.revokeObjectURL(a.href);
   }
   restore(e: Event) {
     const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
@@ -250,7 +251,7 @@ export class DownloadsPage {
 export class HelpPage {
   faqs = [
     { q: 'Why are my prayer times wrong?', a: 'Set your location (Settings → Location) and choose the calculation method used in your region. You can fine-tune each prayer by a few minutes.' },
-    { q: 'How do Azan alerts work?', a: 'Alerts play a chime and show a notification while Islam 360 is open. Allow notifications in the browser when asked.' },
+    { q: 'How do Azan alerts work?', a: 'Alerts play a chime and show a notification while Islam is open. Allow notifications in the browser when asked.' },
     { q: 'Does the app work offline?', a: 'Prayer times, Qibla, Duas, Tasbeeh and the Calendar work offline. Download Quran text and audio from More → Downloads. Hadith chapters you open are cached.' },
     { q: 'The Qibla compass does not move.', a: 'Live compass needs a device with a magnetometer and permission for motion sensors. On desktops the dial shows the Qibla bearing from North.' },
     { q: 'How do I back up my data?', a: 'Settings → Privacy & Security → Backup saves your bookmarks, notes and settings as a JSON file you can restore later.' },
@@ -261,13 +262,13 @@ export class HelpPage {
   selector: 'app-about',
   imports: [HeaderComponent],
   template: `
-    <app-header title="About Islam 360" />
+    <app-header title="About Islam" />
     <div class="pad text-center">
       <div class="hero rounded-4 mb-3" style="min-height:auto">
-        <div class="logo-mark my-3"><i class="bi bi-moon-stars-fill crescent"></i><span class="word fs-1">Islam</span><span class="num fs-1">360</span></div>
+        <div class="logo-mark my-3"><i class="bi bi-moon-stars-fill crescent"></i><span class="word fs-1">Islam</span></div>
         <div class="small opacity-75">Version 1.0.0</div>
       </div>
-      <p>Islam 360 is an all-in-one Islamic companion: Quran, Hadith, Duas, Prayer Times, Qibla, Tasbeeh, Hijri Calendar and more.</p>
+      <p>Islam is an all-in-one Islamic companion: Quran, Hadith, Duas, Prayer Times, Qibla, Tasbeeh, Hijri Calendar and more.</p>
       <div class="card-i text-start small">
         <div class="fw-semibold mb-1">Data sources</div>
         Quran text, translations, transliteration and tafseer: AlQuran Cloud API. Audio: mp3quran.net and Islamic Network CDN.

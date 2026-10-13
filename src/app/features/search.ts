@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
 import { COLLECTIONS, HadithService } from '../core/hadith.service';
 import { QuranService } from '../core/quran.service';
-import { SettingsService } from '../core/settings.service';
+import { TranslationService } from '../core/translation.service';
 import { UserDataService } from '../core/user-data.service';
 import { DUAS } from '../data/duas';
 import { EmptyComponent, HeaderComponent } from '../shared/ui';
@@ -45,7 +45,7 @@ const strip = (s: string) => s.normalize('NFD').replace(/[ً-ٰٟۖ-ۭ]/g, '').t
       } @else if (error()) { <div class="error-box">{{ error() }}</div> }
       @else {
         @if (tab() === 'quran') {
-          <div class="list-i">
+          <div class="list-i" translate="no">
             @for (r of qResults(); track r.surah.number + ':' + r.numberInSurah) {
               <a class="row-i d-block" [routerLink]="['/quran', r.surah.number]" [queryParams]="{ ayah: r.numberInSurah }">
                 <div class="t">{{ r.surah.englishName }} {{ r.surah.number }}:{{ r.numberInSurah }}</div>
@@ -64,7 +64,7 @@ const strip = (s: string) => s.normalize('NFD').replace(/[ً-ٰٟۖ-ۭ]/g, '').t
           <div class="small text-secondary mt-2 px-1">Searches Hadith chapter titles across all collections. Open a chapter to search its text.</div>
         }
         @if (tab() === 'duas') {
-          <div class="list-i">
+          <div class="list-i" translate="no">
             @for (d of dResults(); track d.id) {
               <a class="row-i" [routerLink]="['/duas', d.cats[0]]"><div class="ic"><i class="bi bi-hand-thumbs-up"></i></div>
                 <div class="grow"><div class="t">{{ d.title }}</div><div class="s">{{ d.translation.slice(0, 90) }}…</div></div></a>
@@ -77,7 +77,7 @@ const strip = (s: string) => s.normalize('NFD').replace(/[ً-ٰٟۖ-ۭ]/g, '').t
 export class SearchPage {
   private quran = inject(QuranService);
   private hadith = inject(HadithService);
-  private s = inject(SettingsService);
+  private ts = inject(TranslationService);
   ud = inject(UserDataService);
   suggestions = ['Al-Fatiha', 'Ayat al-Kursi', 'Dua for Rizq', 'Mercy', 'Patience', 'Prayer'];
   q = signal('');
@@ -104,7 +104,7 @@ export class SearchPage {
     if (this.tab() === 'quran') {
       this.loading.set(true);
       try {
-        const [byText, surahs] = await Promise.all([this.quran.search(q, this.s.s().translation).catch(() => []), this.quran.getSurahs().catch(() => [])]);
+        const [byText, surahs] = await Promise.all([this.quran.search(q, this.ts.selectedId()).catch(() => []), this.quran.getSurahs().catch(() => [])]);
         const n = q.toLowerCase();
         const byName = surahs.filter(s => s.englishName.toLowerCase().includes(n) || s.englishNameTranslation.toLowerCase().includes(n) || String(s.number) === n)
           .map(s => ({ surah: s, numberInSurah: 1, text: `${s.englishNameTranslation} · ${s.numberOfAyahs} ayahs` }));

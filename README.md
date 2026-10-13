@@ -1,7 +1,7 @@
-# Islam 360 (Angular 19 + Bootstrap 5)
+# Islam (Angular 19 + Bootstrap 5)
 
 All-in-one Islamic web app: Quran, Hadith, Duas & Azkar, Prayer Times, Qibla, Tasbeeh, Hijri Calendar,
-Audio, Search, Bookmarks, Notes and Settings, built from the "Islam 360 – App Flow & Pages" design.
+Audio, Search, Bookmarks, Notes and Settings, built from the "Islam – App Flow & Pages" design.
 
 ## Run
 
@@ -41,10 +41,32 @@ Bottom-nav tab with five guides: Prayer (Namaz), Fasting (Roza), Hajj, Umrah and
 - Progress, checklists, the Ramadan tracker and bookmarks are stored on the device and included in Backup.
 - `npm test` runs data-integrity tests (needs Chrome; set `CHROME_BIN` if it is not on the default path).
 
+## Languages (API-driven)
+
+Settings > Language (also More > Language and the first-run setup) lists every language from an API and translates the whole interface into the chosen one.
+
+- **Language list:** the translation provider (240+ languages) plus a countries API that gives each country's languages with native names and text direction. Browse **All languages** or **By country**; any language can be chosen in any country. Lists are cached for 7 days; if the APIs are down a short list is built from the browser's languages.
+- **Translation:** `DomTranslator` translates all visible text, placeholders and tooltips (menus, buttons, forms, dialogs, toasts, notifications) through `TranslateService`, which batches requests, falls back between providers and caches every string per language on the device. New screens and new languages need no code changes. If the service is unreachable the app shows English and offers Retry.
+- **Not machine-translated:** Quran, Hadith and Dua texts, names and your notes (marked `translate="no"`). Ibadaat lesson text is translated only if you switch on "Translate lesson text too" (it is marked `data-content`).
+- **Default language:** the browser's language if the API supports it, otherwise English. The choice is saved in settings and restored on every visit.
+- **Providers** are configured in `src/app/core/i18n.config.ts`. The no-setup default is Google's public web translate endpoint, which is not an officially supported API; for production set up LibreTranslate (self-hosted or with a key) in the same file and it is used first.
+
+## Quran translations
+
+The reader and Settings have a translator picker (Urdu translators first). The choice is saved in settings, restored on the next visit, and used by the reader, search, daily ayah and offline downloads.
+
+| Translator | Source |
+|---|---|
+| Fateh Muhammad Jalandhari, Ahmad Raza Khan (Kanz-ul-Iman), Maududi (Tafheem-ul-Quran), Muhammad Junagarhi | AlQuran Cloud (Tanzil) |
+| Mufti Muhammad Taqi Usmani (Aasan Tarjuma-e-Quran) | Quran API by fawazahmed0 (public domain), via jsDelivr |
+| Shah Abdul Qadir Dehlvi, Shah Rafiuddin Dehlvi, Ashraf Ali Thanvi (Bayan-ul-Quran) | **Not available yet** - no complete, openly licensed digital edition was found. They are listed but cannot be selected, and no other translation is shown in their place. |
+
+Every translation is checked at load time to have exactly one entry per ayah. To add a source later, add an entry to `src/app/core/translation.service.ts` (and a provider in `quran.service.ts` if it is a new API).
+
 ## Install on a phone (PWA)
 
 - Build: `npm run build`, then host `dist/islam360/browser` on any **https** site (Vercel config included in `vercel.json`).
-- Android (Chrome): menu > Install app, or More > Install app inside Islam 360. iPhone (Safari): Share > Add to Home Screen.
+- Android (Chrome): menu > Install app, or More > Install app inside Islam. iPhone (Safari): Share > Add to Home Screen.
 - Once installed it opens full-screen with its own icon and works offline (service worker is active in production builds only).
 - Icons are in `public/icons`; app name and colours are in `public/manifest.webmanifest`; caching rules are in `ngsw-config.json`.
 

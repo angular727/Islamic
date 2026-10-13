@@ -3,6 +3,7 @@ import { PRAYERS, PrayerKey, SettingsService } from './settings.service';
 import { PrayerService } from './prayer.service';
 import { ToastService } from './toast.service';
 import { UserDataService } from './user-data.service';
+import { TranslateService } from './translate.service';
 import { lsGet, lsSet } from './store';
 
 /**
@@ -15,6 +16,7 @@ export class NotifyService {
   private prayer = inject(PrayerService);
   private toast = inject(ToastService);
   private data = inject(UserDataService);
+  private i18n = inject(TranslateService);
   private fired = new Set<string>(lsGet<string[]>('i360.fired', []));
   private ctx?: AudioContext;
 
@@ -68,7 +70,8 @@ export class NotifyService {
 
   private notify(title: string, body: string) {
     this.toast.show(title, 5000);
-    try { if (this.permission === 'granted') new Notification(title, { body, icon: 'favicon.ico', tag: title }); } catch { /* ignore */ }
+    if (this.permission !== 'granted') return;
+    this.i18n.many([title, body]).then(([t, b]) => { try { new Notification(t, { body: b, icon: 'favicon.ico', tag: title }); } catch { /* ignore */ } });
   }
 
   /** Soft three-note chime (no audio file needed). */

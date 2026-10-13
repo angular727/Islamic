@@ -39,7 +39,7 @@ import { ListenComponent } from './listen';
       }
 
       @case ('rec') {
-        <div class="rec">
+        <div class="rec" translate="no">
           <div class="fw-semibold">{{ b.title }}</div>
           <div class="small text-secondary mb-2">{{ b.when }}</div>
           <div class="arabic-plain ar">{{ b.ar }}</div>
@@ -55,7 +55,7 @@ import { ListenComponent } from './listen';
 
       @case ('dua') {
         @if (dua(b.id); as d) {
-          <div class="rec">
+          <div class="rec" translate="no">
             <div class="fw-semibold">{{ d.title }}</div>
             @if (b.when) { <div class="small text-secondary mb-2">{{ b.when }}</div> }
             <div class="arabic-plain ar">{{ d.arabic }}</div>
@@ -113,7 +113,7 @@ import { ListenComponent } from './listen';
       }
 
       @case ('refs') {
-        <div class="refs">
+        <div class="refs" translate="no">
           @for (it of b.items; track $index) {
             <div class="ref-row"><span class="chip gold">{{ it.ref }}</span><span>{{ it.text }}</span></div>
           }

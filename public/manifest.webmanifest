@@ -1,6 +1,6 @@
 {
-  "name": "Islam 360",
-  "short_name": "Islam 360",
+  "name": "Islam",
+  "short_name": "Islam",
   "description": "Quran, Hadith, Duas, Prayer Times, Qibla, Tasbeeh, Ibadaat guides and more.",
   "id": "/",
   "start_url": "/?source=pwa",

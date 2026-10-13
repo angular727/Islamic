@@ -1,4 +1,4 @@
-/* Islam 360 – global design system (Bootstrap 5 + custom tokens) */
+/* Islam – global design system (Bootstrap 5 + custom tokens) */
 :root {
   --g-900: #06402a; --g-700: #0b5d3b; --g-500: #1a7f55; --g-100: #e4f1ea; --g-50: #f1f8f4;
   --gold: #c9a24b; --gold-soft: #f6eccf;
@@ -115,7 +115,7 @@ textarea.input-i { height: auto; padding: 12px 14px; }
 }
 .logo-mark { text-align: center; line-height: 1; font-family: 'Inter', sans-serif;
   .crescent { font-size: 38px; color: var(--gold); display: block; margin-bottom: 4px; }
-  .word { font-size: 56px; font-weight: 300; letter-spacing: 2px; display: block; }
+  .word { font-size: 64px; font-weight: 600; letter-spacing: 2px; display: block; }
   .num { font-size: 56px; font-weight: 700; letter-spacing: 3px; display: block; margin-top: -6px; }
 }
 
