@@ -102,7 +102,7 @@ export class AudioService {
 
   private mediaSession(s: Surah, r: Reciter) {
     if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.metadata = new MediaMetadata({ title: `${s.englishName} · ${s.name}`, artist: r.name, album: 'Islam 360' });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: `${s.englishName} · ${s.name}`, artist: r.name, album: 'Islam' });
     navigator.mediaSession.setActionHandler('play', () => this.toggle());
     navigator.mediaSession.setActionHandler('pause', () => this.toggle());
     navigator.mediaSession.setActionHandler('nexttrack', () => this.next());

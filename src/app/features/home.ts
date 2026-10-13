@@ -5,6 +5,8 @@ import { LocationService } from '../core/location.service';
 import { PrayerService } from '../core/prayer.service';
 import { SettingsService } from '../core/settings.service';
 import { UserDataService } from '../core/user-data.service';
+import { QuranService } from '../core/quran.service';
+import { TranslationService } from '../core/translation.service';
 import { toHijri, HIJRI_MONTHS } from '../core/hijri';
 import { InstallService } from '../core/install.service';
 import { HeaderComponent, SheetComponent } from '../shared/ui';
@@ -74,7 +76,7 @@ export const TILES: Tile[] = [
       }
 
       <div class="section-title">{{ 'dailyAyah' | t }}</div>
-      <div class="card-i">
+      <div class="card-i" translate="no">
         @if (ayah(); as a) {
           <div class="arabic fs-4">{{ a.ar }}</div>
           <p class="mt-2 mb-1">{{ a.en }}</p>
@@ -95,6 +97,8 @@ export class HomePage {
   loc = inject(LocationService);
   p = inject(PrayerService);
   ud = inject(UserDataService);
+  private quran = inject(QuranService);
+  private ts = inject(TranslationService);
   tiles = TILES;
   ayah = signal<{ ar: string; en: string; surah: number; num: number; name: string } | null>(null);
   ayahError = signal(false);
@@ -116,9 +120,10 @@ export class HomePage {
     const day = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 864e5);
     const n = (day * 53 + d.getFullYear()) % 6236 + 1;
     try {
-      const r = await fetch(`https://api.alquran.cloud/v1/ayah/${n}/editions/quran-uthmani,en.sahih`);
+      const r = await fetch(`https://api.alquran.cloud/v1/ayah/${n}/quran-uthmani`);
       const j = (await r.json()).data;
-      this.ayah.set({ ar: j[0].text, en: j[1].text, surah: j[0].surah.number, num: j[0].numberInSurah, name: j[0].surah.englishName });
+      const text = await this.quran.translatedAyah(j.surah.number, j.numberInSurah, this.ts.selectedId()).catch(() => '');
+      this.ayah.set({ ar: j.text, en: text, surah: j.surah.number, num: j.numberInSurah, name: j.surah.englishName });
     } catch { this.ayahError.set(true); }
   }
 }
@@ -184,17 +189,17 @@ export class LibraryPage {
         @if (!inst.installed()) {
           <button class="row-i" (click)="install()">
             <div class="ic"><i class="bi bi-phone"></i></div>
-            <div class="grow"><div class="t">Install app</div><div class="s">Add Islam 360 to your home screen</div></div>
+            <div class="grow"><div class="t">Install app</div><div class="s">Add Islam to your home screen</div></div>
             <i class="bi bi-download chev"></i>
           </button>
         }
         <button class="row-i" (click)="share()">
-          <div class="ic"><i class="bi bi-share"></i></div><div class="grow t">{{ 'share' | t }} Islam 360</div></button>
+          <div class="ic"><i class="bi bi-share"></i></div><div class="grow t">{{ 'share' | t }} Islam</div></button>
       </div>
     </div>
     @if (help()) {
       <app-sheet (closed)="help.set(false)">
-        <h6>Install Islam 360</h6>
+        <h6>Install Islam</h6>
         @if (inst.ios) {
           <ol class="mb-0 ps-3">
             <li class="mb-2">Open this page in <b>Safari</b>.</li>
@@ -231,13 +236,14 @@ export class MorePage {
     { link: '/bookmarks', icon: 'bookmark', key: 'bookmarks' },
     { link: '/notes', icon: 'journal-text', key: 'notes' },
     { link: '/settings', icon: 'gear', key: 'settings' },
+    { link: '/language', icon: 'translate', key: 'language' },
     { link: '/themes', icon: 'palette', key: 'themes' },
     { link: '/downloads', icon: 'download', key: 'downloads' },
     { link: '/help', icon: 'headset', key: 'help' },
     { link: '/about', icon: 'info-circle', key: 'about' },
   ];
   share() {
-    const data = { title: 'Islam 360', text: 'Islam 360 – Quran, Hadith, Duas, Prayer Times, Qibla and more.', url: location.origin };
+    const data = { title: 'Islam', text: 'Islam – Quran, Hadith, Duas, Prayer Times, Qibla and more.', url: location.origin };
     if (navigator.share) navigator.share(data).catch(() => {});
     else navigator.clipboard?.writeText(data.url);
   }

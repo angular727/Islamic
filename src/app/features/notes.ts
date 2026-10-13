@@ -17,7 +17,7 @@ import { EmptyComponent, HeaderComponent, SheetComponent } from '../shared/ui';
       <div class="search-box mb-3"><i class="bi bi-search"></i>
         <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search notes" /></div>
       @for (n of list(); track n.id) {
-        <div class="note mb-3" [style.background]="n.color" (click)="edit(n)">
+        <div class="note mb-3" translate="no" [style.background]="n.color" (click)="edit(n)">
           <div class="d-flex align-items-start gap-2">
             <div class="fw-semibold flex-grow-1 text-dark">{{ n.title }}</div>
             @if (n.reminder) { <i class="bi bi-bell-fill text-warning" title="Reminder"></i> }

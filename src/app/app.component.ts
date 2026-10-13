@@ -3,6 +3,9 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { TPipe } from './core/i18n';
 import { LockService } from './core/lock.service';
+import { DomTranslator } from './core/dom-translator.service';
+import { LanguageService } from './core/language.service';
+import { TranslateService } from './core/translate.service';
 import { NotifyService } from './core/notify.service';
 import { SettingsService } from './core/settings.service';
 import { ToastService } from './core/toast.service';
@@ -27,19 +30,23 @@ const TABS = ['/home', '/library', '/ibadaat', '/search', '/more'];
         </nav>
       }
       @if (toast.msg()) { <div class="toast-msg" role="status">{{ toast.msg() }}</div> }
+      @if (tr.pending() > 0) { <div class="i18n-busy" role="status" translate="no"><span class="spinner-border spinner-border-sm"></span> {{ langs.current().native }} …</div> }
       @if (lock.locked()) {
         <div class="lock">
-          <div class="logo-mark mb-4"><i class="bi bi-lock-fill crescent"></i><span class="num fs-2">Islam 360</span></div>
+          <div class="logo-mark mb-4"><i class="bi bi-lock-fill crescent"></i><span class="num fs-2">Islam</span></div>
           <input class="input-i text-center mb-2" style="max-width:200px" type="password" inputmode="numeric" maxlength="4"
                  [value]="pin()" (input)="onPin($any($event.target).value)" placeholder="Enter PIN" autofocus />
           @if (bad()) { <div class="small text-warning">Incorrect PIN</div> }
         </div>
       }
     </div>`,
-  styles: [`.lock { position: absolute; inset: 0; z-index: 200; background: var(--g-900); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }`],
+  styles: [`.i18n-busy { position: absolute; top: 10px; inset-inline-end: 10px; z-index: 90; background: rgba(6, 64, 42, .92); color: #fff; font-size: 12px; padding: 5px 12px; border-radius: 99px; display: flex; gap: 8px; align-items: center; }
+    .lock { position: absolute; inset: 0; z-index: 200; background: var(--g-900); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }`],
 })
 export class AppComponent {
   toast = inject(ToastService);
+  tr = inject(TranslateService);
+  langs = inject(LanguageService);
   lock = inject(LockService);
   pin = signal('');
   bad = signal(false);
@@ -58,6 +65,9 @@ export class AppComponent {
   constructor() {
     this.settings.applyTheme();
     inject(NotifyService).start();
+    inject(DomTranslator).start();
+    // Language list from the API; on a first visit the browser's language is used if supported.
+    this.langs.load().then(() => this.langs.applyDefault());
     this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(e =>
       this.showNav.set(TABS.some(t => (e as NavigationEnd).urlAfterRedirects.startsWith(t))));
   }

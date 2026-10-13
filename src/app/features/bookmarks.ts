@@ -26,7 +26,7 @@ import { EmptyComponent, HeaderComponent, SheetComponent } from '../shared/ui';
       </select>
 
       @for (b of items(); track b.id) {
-        <div class="card-i mb-3">
+        <div class="card-i mb-3" translate="no">
           <button class="w-100 text-start border-0 bg-transparent p-0" (click)="open(b)">
             <div class="d-flex align-items-center gap-2 mb-1"><span class="fw-semibold flex-grow-1">{{ b.title }}</span><span class="chip">{{ b.folder }}</span></div>
             @if (b.arabic) { <div class="arabic-plain fs-5 clamp">{{ b.arabic }}</div> }

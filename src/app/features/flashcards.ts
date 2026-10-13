@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 import { Card, DECKS, DeckId, DeckInfo, LearnService } from '../core/learn.service';
 import { ToastService } from '../core/toast.service';
+import { TranslateService } from '../core/translate.service';
 import { ListenComponent } from '../shared/listen';
 import { EmptyComponent, HeaderComponent, SkeletonComponent } from '../shared/ui';
 
@@ -74,7 +75,7 @@ export class FlashcardsHubPage {
             <button class="btn-i sm mt-3" (click)="setMode('all')">Practice all cards</button>
           </app-empty>
         } @else { @if (card(); as c) {
-          <div class="scene" (pointerdown)="down($event)" (pointerup)="up($event)" (click)="onTap($event)">
+          <div class="scene" translate="no" (pointerdown)="down($event)" (pointerup)="up($event)" (click)="onTap($event)">
             <div class="flip" [class.flipped]="flipped()">
               <div class="face front">
                 <div class="small text-secondary">{{ idx() + 1 }} / {{ order().length }}</div>
@@ -133,6 +134,7 @@ export class FlashcardsPage {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(ToastService);
+  private i18n = inject(TranslateService);
 
   deckId = this.route.snapshot.paramMap.get('deck') as DeckId;
   info: DeckInfo | undefined = DECKS.find(d => d.id === this.deckId);
@@ -203,8 +205,8 @@ export class FlashcardsPage {
     } else this.go(1);
   }
 
-  reset() {
-    if (!confirm('Reset your progress for this deck?')) return;
+  async reset() {
+    if (!confirm(await this.i18n.one('Reset your progress for this deck?'))) return;
     this.learn.reset(this.deckId); this.rebuild(); this.toast.show('Progress reset');
   }
 

@@ -43,7 +43,7 @@ export class DuasPage {
     <app-header [title]="title()" />
     <div class="pad">
       @for (d of list(); track d.id) {
-        <div class="card-i mb-3">
+        <div class="card-i mb-3" translate="no">
           <div class="d-flex align-items-center mb-2">
             <div class="fw-semibold flex-grow-1">{{ d.title }}</div>
             <button class="icon-btn" [class.on]="fav(d)" (click)="ud.toggleFavDua(d.id)" aria-label="Favorite"><i class="bi" [class]="fav(d) ? 'bi-heart-fill' : 'bi-heart'"></i></button>
@@ -95,5 +95,5 @@ export class DuaCategoryPage {
   }
   private fmt(d: Dua) { return `${d.title}\n\n${d.arabic}\n\n${d.translit}\n\n${d.translation}\n— ${d.reference}`; }
   copy(d: Dua) { navigator.clipboard?.writeText(this.fmt(d)); this.toast.show('Copied'); }
-  share(d: Dua) { navigator.share ? navigator.share({ title: 'Islam 360', text: this.fmt(d) }).catch(() => {}) : this.copy(d); }
+  share(d: Dua) { navigator.share ? navigator.share({ title: 'Islam', text: this.fmt(d) }).catch(() => {}) : this.copy(d); }
 }

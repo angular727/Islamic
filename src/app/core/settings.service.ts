@@ -1,5 +1,6 @@
 import { Injectable, effect, signal } from '@angular/core';
-import { Lang, LANGS } from './i18n';
+import { Lang } from './i18n';
+import { isRtl } from './lang-utils';
 import { lsGet, lsSet } from './store';
 
 export interface Loc { name: string; lat: number; lng: number; tz?: string; auto?: boolean }
@@ -31,6 +32,8 @@ export interface Settings {
   sound: boolean;
   azkarReminders: boolean;
   analytics: boolean;
+  /** Also machine-translate teaching text (lessons). Quran, Hadith and Dua texts are never machine-translated. */
+  translateContent: boolean;
 }
 
 export const DEFAULTS: Settings = {
@@ -39,12 +42,14 @@ export const DEFAULTS: Settings = {
   adjustments: { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
   azan: { fajr: 'azan', sunrise: 'off', dhuhr: 'azan', asr: 'azan', maghrib: 'azan', isha: 'azan' },
   preReminder: 0, location: null, savedLocations: [], hijriAdjust: 0,
-  translation: 'en.sahih', showTranslation: true, showTranslit: false, arabicSize: 30, transSize: 16,
-  haptics: true, sound: true, azkarReminders: false, analytics: false,
+  translation: 'ur.jalandhry', showTranslation: true, showTranslit: false, arabicSize: 30, transSize: 16,
+  haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: false,
 };
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
+  /** True on the very first visit (nothing saved yet); used to pick a default language. */
+  readonly firstRun = !lsGet<unknown>('i360.settings', null);
   readonly s = signal<Settings>({ ...DEFAULTS, ...lsGet<Partial<Settings>>('i360.settings', {}) });
 
   constructor() {
@@ -54,7 +59,7 @@ export class SettingsService {
 
   patch(p: Partial<Settings>) { this.s.update(v => ({ ...v, ...p })); }
 
-  get rtl() { return LANGS.find(l => l.code === this.s().lang)?.rtl ?? false; }
+  get rtl() { return isRtl(this.s().lang); }
 
   applyTheme() {
     const v = this.s();

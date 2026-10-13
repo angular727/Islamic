@@ -3,7 +3,9 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AudioService } from '../core/audio.service';
 import { TPipe } from '../core/i18n';
-import { JUZ_START, QuranService, Surah, SurahContent, TAFSIRS, TRANSLATIONS } from '../core/quran.service';
+import { JUZ_START, QuranService, Surah, SurahContent, TAFSIRS } from '../core/quran.service';
+import { TranslationService } from '../core/translation.service';
+import { TranslationPickerComponent } from '../shared/translation-picker';
 import { SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
 import { UserDataService } from '../core/user-data.service';
@@ -44,7 +46,7 @@ import { EmptyComponent, HeaderComponent, SheetComponent, SkeletonComponent } fr
               <a class="row-i" [routerLink]="['/quran', s.number]">
                 <div class="num-badge">{{ s.number }}</div>
                 <div class="grow">
-                  <div class="t">{{ s.englishName }}</div>
+                  <div class="t" translate="no">{{ s.englishName }}</div>
                   <div class="s">{{ s.englishNameTranslation }} · {{ s.numberOfAyahs }} ayahs · {{ s.revelationType }}</div>
                 </div>
                 <div class="arabic-plain fs-5">{{ s.name.replace('سُورَةُ ', '') }}</div>
@@ -104,9 +106,9 @@ export class QuranListPage {
 
 @Component({
   selector: 'app-quran-reader',
-  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, SheetComponent],
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, SheetComponent, TranslationPickerComponent],
   template: `
-    <app-header [title]="data()?.surah?.englishName ?? ('quran' | t)" [hasActions]="true">
+    <app-header translate="no" [title]="data()?.surah?.englishName ?? ('quran' | t)" [hasActions]="true">
       <button class="icon-btn" (click)="playSurah()" aria-label="Play surah"><i class="bi bi-play-circle"></i></button>
       <button class="icon-btn" (click)="sheet.set('settings')" aria-label="Reader settings"><i class="bi bi-sliders"></i></button>
     </app-header>
@@ -118,10 +120,14 @@ export class QuranListPage {
         <div class="small opacity-75">{{ d.surah.revelationType }} · {{ d.surah.numberOfAyahs }} ayahs · {{ 'juz' | t }} {{ d.arabic[0].juz }}</div>
         <div class="arabic-plain fs-3">{{ d.surah.name }}</div>
         <div>{{ d.surah.englishNameTranslation }}</div>
+        @if (s.s().showTranslation) {
+          <button class="tr-chip" (click)="sheet.set('settings')" aria-label="Change translation"><i class="bi bi-translate"></i> {{ ts.selected().name }} · {{ ts.selected().title }}</button>
+        }
       </div>
+      @if (transError()) { <div class="error-box m-3">{{ transError() }} <button class="btn btn-sm btn-outline-danger ms-2" (click)="loadTranslation()">{{ 'retry' | t }}</button></div> }
       @if (n() !== 1 && n() !== 9) { <div class="arabic text-center fs-3 py-3 bsm">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div> }
 
-      <div class="ayahs">
+      <div class="ayahs" translate="no">
         @for (a of d.arabic; track a.numberInSurah; let i = $index) {
           <div class="ayah" [id]="'a' + a.numberInSurah" [class.playing]="playing() === a.numberInSurah">
             <div class="d-flex align-items-center mb-2 gap-1">
@@ -133,8 +139,11 @@ export class QuranListPage {
             </div>
             <div class="arabic" [style.font-size.px]="s.s().arabicSize">{{ text(a.numberInSurah, a.text) }}<span class="ayah-end">{{ a.numberInSurah }}</span></div>
             @if (s.s().showTranslit && d.translit[i]) { <div class="translit">{{ d.translit[i].text }}</div> }
-            @if (s.s().showTranslation && d.translation[i]) {
-              <div class="trans" [dir]="transDir()" [style.font-size.px]="s.s().transSize">{{ d.translation[i].text }}</div>
+            @if (s.s().showTranslation) {
+              @if (transLoading()) { <div class="skeleton mt-2" style="height:44px"></div> }
+              @else if (d.translation[i]) {
+                <div class="trans" [class.urdu]="ts.isUrdu()" [dir]="transDir()" [lang]="ts.selected().language" [style.font-size.px]="ts.isUrdu() ? s.s().transSize + 2 : s.s().transSize">{{ d.translation[i].text }}</div>
+              }
             }
           </div>
         }
@@ -154,10 +163,8 @@ export class QuranListPage {
         <input type="range" class="form-range" min="12" max="26" [ngModel]="s.s().transSize" (ngModelChange)="s.patch({ transSize: +$event })" />
         <div class="form-check form-switch my-2"><input class="form-check-input" type="checkbox" id="tr" [ngModel]="s.s().showTranslation" (ngModelChange)="s.patch({ showTranslation: $event })" /><label class="form-check-label" for="tr">Show translation</label></div>
         <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="tl" [ngModel]="s.s().showTranslit" (ngModelChange)="s.patch({ showTranslit: $event })" /><label class="form-check-label" for="tl">Show transliteration</label></div>
-        <label class="small text-secondary">Translation</label>
-        <select class="form-select" [ngModel]="s.s().translation" (ngModelChange)="changeTranslation($event)">
-          @for (t of translations; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
-        </select>
+        <label class="small text-secondary mb-1">Translation</label>
+        <app-translation-picker (changed)="loadTranslation()" />
       </app-sheet>
     }
     @if (sheet() === 'menu' && sel()) {
@@ -189,7 +196,9 @@ export class QuranListPage {
     .ayah.playing { background: var(--g-100); }
     .icon-btn.sm { width: 32px; height: 32px; font-size: 17px; }
     .translit { color: var(--g-700); font-style: italic; margin-top: 6px; font-size: 14px; }
-    .trans { margin-top: 8px; color: var(--text); opacity: .9; line-height: 1.6; }
+    .trans { margin-top: 8px; color: var(--text); opacity: .95; line-height: 1.6; }
+    .trans.urdu { line-height: 2.2; text-align: right; }
+    .tr-chip { margin-top: 8px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; border-radius: 99px; padding: 4px 12px; font-size: 12px; max-width: 100%; }
   `],
 })
 export class QuranReaderPage implements OnDestroy {
@@ -202,7 +211,9 @@ export class QuranReaderPage implements OnDestroy {
   s = inject(SettingsService);
   ud = inject(UserDataService);
 
-  translations = TRANSLATIONS;
+  ts = inject(TranslationService);
+  transLoading = signal(false);
+  transError = signal('');
   tafsirs = TAFSIRS;
   n = signal(1);
   data = signal<SurahContent | null>(null);
@@ -213,7 +224,7 @@ export class QuranReaderPage implements OnDestroy {
   playing = signal(0);
   tafsirId = signal('ar.jalalayn');
   tafsirText = signal<string | null>(null);
-  transDir = computed(() => TRANSLATIONS.find(t => t.id === this.s.s().translation)?.dir ?? 'ltr');
+  transDir = computed(() => this.ts.selected().dir);
   private ayahAudio = new Audio();
   private scrollTo = 0;
 
@@ -227,7 +238,8 @@ export class QuranReaderPage implements OnDestroy {
   async load() {
     this.loading.set(true); this.error.set(''); this.stopAyah();
     try {
-      this.data.set(await this.quran.getSurah(this.n(), this.s.s().translation));
+      this.transError.set('');
+      this.data.set(await this.quran.getSurah(this.n(), this.ts.selectedId()));
       this.loading.set(false);
       setTimeout(() => this.scroll(), 50);
     } catch { this.error.set('Could not load this surah. Check your connection.'); this.loading.set(false); }
@@ -249,7 +261,16 @@ export class QuranReaderPage implements OnDestroy {
     return t;
   }
 
-  changeTranslation(id: string) { this.s.patch({ translation: id }); this.load(); }
+  /** Swaps only the translation of the open surah, so the Arabic and the scroll position stay as they are. */
+  async loadTranslation() {
+    if (!this.data()) return;
+    this.transLoading.set(true); this.transError.set('');
+    try {
+      const t = await this.quran.translation(this.n(), this.ts.selectedId());
+      this.data.update(d => d && ({ ...d, translation: t }));
+    } catch (e: any) { this.transError.set(e?.message ?? 'Could not load this translation. Check your connection.'); }
+    this.transLoading.set(false);
+  }
 
   private ayahText(num: number) {
     const d = this.data()!;
@@ -273,7 +294,7 @@ export class QuranReaderPage implements OnDestroy {
   share() {
     const t = this.ayahText(this.sel());
     const text = `${t.ar}\n\n${t.tr}\n— ${this.ref(this.sel())}`;
-    if (navigator.share) navigator.share({ title: 'Islam 360', text }).catch(() => {}); else { navigator.clipboard?.writeText(text); this.toast.show('Copied'); }
+    if (navigator.share) navigator.share({ title: 'Islam', text }).catch(() => {}); else { navigator.clipboard?.writeText(text); this.toast.show('Copied'); }
     this.sheet.set('');
   }
   addNote() {

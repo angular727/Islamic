@@ -50,7 +50,7 @@ const ACTION: Record<WaqfAction, { label: string; cls: string }> = {
               <span class="pill-tag" [class]="act(r.action).cls">{{ act(r.action).label }} · {{ r.short }}</span>
             </div>
           </div>
-          <div class="body">
+          <div class="body" data-content>
             <div class="lbl">Meaning</div><p>{{ r.meaning }}</p>
             <div class="lbl">What to do</div><p>{{ r.when }}</p>
             <div class="tip"><i class="bi bi-lightbulb"></i><span>{{ r.tip }}</span></div>
@@ -58,7 +58,7 @@ const ACTION: Record<WaqfAction, { label: string; cls: string }> = {
 
           @if (r.exampleKey && examples(); as ex) {
             @for (e of ex[r.exampleKey].slice(0, 1); track e.ref) {
-              <div class="example">
+              <div class="example" translate="no">
                 <div class="small text-secondary mb-1">Example · {{ e.surah }} {{ e.ref }}</div>
                 <div class="arabic" style="font-size:26px">{{ e.text }}</div>
                 <div class="small mt-1">{{ e.en }}</div>

@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
 import { IbadaatService, RAMADAN_ITEMS, RamadanItem } from '../core/ibadaat.service';
 import { HIJRI_MONTHS, toHijri } from '../core/hijri';
+import { TranslateService } from '../core/translate.service';
 import { SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
 import { UserDataService } from '../core/user-data.service';
@@ -229,7 +230,8 @@ export class RamadanTrackerComponent {
   days = Array.from({ length: 30 }, (_, i) => i + 1);
   sel = signal((() => { const h = toHijri(new Date()); return h.m === 9 ? Math.min(30, h.d) : 1; })());
   level(d: number) { const r = this.ib.ramadan()[d] ?? {}; return Object.values(r).filter(Boolean).length / this.items.length; }
-  reset() { if (confirm('Clear all Ramadan tracker entries?')) { this.ib.resetRamadan(); this.toast.show('Tracker cleared'); } }
+  private i18n = inject(TranslateService);
+  async reset() { if (confirm(await this.i18n.one('Clear all Ramadan tracker entries?'))) { this.ib.resetRamadan(); this.toast.show('Tracker cleared'); } }
 }
 
 @Component({
@@ -258,7 +260,16 @@ export class RamadanTrackerComponent {
           <app-school-picker />
         </div>
 
-        <p class="intro">{{ f.lesson.intro }}</p>
+        @if (!tr.isSource() && !settings.s().translateContent) {
+          <div class="content-note"><i class="bi bi-info-circle"></i>
+            <span>Lesson text is shown in its original language so religious rulings stay accurate.</span>
+            <button class="btn btn-sm btn-outline-success" (click)="settings.patch({ translateContent: true })">Translate it (machine translation)</button></div>
+        } @else if (!tr.isSource()) {
+          <div class="content-note warn"><i class="bi bi-exclamation-triangle"></i>
+            <span>Lesson text is machine-translated and may contain errors. Check important rulings with a scholar.</span>
+            <button class="btn btn-sm btn-outline-secondary" (click)="settings.patch({ translateContent: false })">Show original</button></div>
+        }
+        <p class="intro" data-content>{{ f.lesson.intro }}</p>
 
         @if (f.lesson.sections.length) {
           <div class="d-flex justify-content-end gap-3 mb-2">
@@ -268,7 +279,7 @@ export class RamadanTrackerComponent {
         }
 
         @for (s of f.lesson.sections; track $index; let si = $index) {
-          <div class="acc" [class.open]="isOpen(si)">
+          <div class="acc" data-content [class.open]="isOpen(si)">
             <button class="acc-h" (click)="toggle(si)" [attr.aria-expanded]="isOpen(si)">
               <span class="flex-grow-1 text-start">{{ s.title }}</span><i class="bi bi-chevron-down"></i>
             </button>
@@ -310,6 +321,9 @@ export class RamadanTrackerComponent {
     .acc-h i { transition: transform .2s; color: var(--g-700); } .acc.open .acc-h i { transform: rotate(180deg); } .acc.open .acc-h { color: var(--g-700); }
     .acc-b { padding: 4px 14px 6px; }
     .disc { font-size: 12.5px; color: var(--muted); }
+    .content-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; color: #6b5314; }
+    .content-note span { flex: 1 1 200px; }
+    .content-note.warn { background: #fdf0e6; color: #7a3f06; }
   `],
 })
 export class IbadaatLessonPage {
@@ -317,7 +331,8 @@ export class IbadaatLessonPage {
   private ib = inject(IbadaatService);
   private ud = inject(UserDataService);
   private toast = inject(ToastService);
-  private settings = inject(SettingsService);
+  settings = inject(SettingsService);
+  tr = inject(TranslateService);
   disclaimer = DISCLAIMER;
 
   private params = toSignal(this.route.paramMap);
@@ -356,7 +371,7 @@ export class IbadaatLessonPage {
 
   share() {
     const f = this.found!;
-    const data = { title: f.lesson.title, text: `${f.lesson.title} – ${f.section.en} (Islam 360)\n${f.lesson.intro}`, url: `${location.origin}/ibadaat/${this.idKey}` };
+    const data = { title: f.lesson.title, text: `${f.lesson.title} – ${f.section.en} (Islam)\n${f.lesson.intro}`, url: `${location.origin}/ibadaat/${this.idKey}` };
     if (navigator.share) navigator.share(data).catch(() => {});
     else { navigator.clipboard?.writeText(`${data.text}\n${data.url}`); this.toast.show('Copied to clipboard'); }
   }
