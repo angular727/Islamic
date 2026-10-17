@@ -9,6 +9,15 @@
   ],
   "headers": [
     {
+      "source": "/sw-custom.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
       "source": "/ngsw-worker.js",
       "headers": [
         {

@@ -3,7 +3,8 @@ import { RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 import { LocationService } from '../core/location.service';
 import { PrayerService } from '../core/prayer.service';
-import { SettingsService } from '../core/settings.service';
+import { FivePrayer, SettingsService } from '../core/settings.service';
+import { NotifyService } from '../core/notify.service';
 import { UserDataService } from '../core/user-data.service';
 import { QuranService } from '../core/quran.service';
 import { TranslationService } from '../core/translation.service';
@@ -106,14 +107,13 @@ export class HomePage {
   hijri = computed(() => toHijri(this.p.now(), this.s.s().hijriAdjust));
   month = computed(() => HIJRI_MONTHS[this.hijri().m - 1]);
   initial = computed(() => (this.s.s().name || 'G').charAt(0).toUpperCase());
-  muted = computed(() => this.s.s().azan[this.next().key] === 'off');
+  private notify = inject(NotifyService);
+  muted = computed(() => { const s = this.s.s(), k = this.next().key as FivePrayer; return !(s.notifications && s.notifyPrayer[k]?.on); });
 
   constructor() { this.loadAyah(); }
 
-  toggleMute() {
-    const k = this.next().key;
-    this.s.patch({ azan: { ...this.s.s().azan, [k]: this.muted() ? 'azan' : 'off' } });
-  }
+  /** The bell on the next-prayer card: switches that prayer's notification (asking for permission first if needed). */
+  toggleMute() { void this.notify.togglePrayerNotify(this.next().key as FivePrayer); }
 
   private async loadAyah() {
     const d = new Date();

@@ -1,10 +1,12 @@
-import { Component, ElementRef, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AudioService } from '../core/audio.service';
 import { TPipe } from '../core/i18n';
 import { JUZ_START, QuranService, Surah, SurahContent, TAFSIRS } from '../core/quran.service';
 import { TranslationService } from '../core/translation.service';
+import { AyahPlayerService, PlayerContent } from '../core/ayah-player.service';
+import { AyahPlayerBarComponent } from '../shared/ayah-player-bar';
 import { TranslationPickerComponent } from '../shared/translation-picker';
 import { SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
@@ -106,9 +108,10 @@ export class QuranListPage {
 
 @Component({
   selector: 'app-quran-reader',
-  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, SheetComponent, TranslationPickerComponent],
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SkeletonComponent, SheetComponent, TranslationPickerComponent, AyahPlayerBarComponent],
   template: `
     <app-header translate="no" [title]="data()?.surah?.englishName ?? ('quran' | t)" [hasActions]="true">
+      <button class="icon-btn" (click)="listen()" aria-label="Listen ayah by ayah with translation" title="Recitation + translation"><i class="bi bi-soundwave"></i></button>
       <button class="icon-btn" (click)="playSurah()" aria-label="Play surah"><i class="bi bi-play-circle"></i></button>
       <button class="icon-btn" (click)="sheet.set('settings')" aria-label="Reader settings"><i class="bi bi-sliders"></i></button>
     </app-header>
@@ -129,11 +132,14 @@ export class QuranListPage {
 
       <div class="ayahs" translate="no">
         @for (a of d.arabic; track a.numberInSurah; let i = $index) {
-          <div class="ayah" [id]="'a' + a.numberInSurah" [class.playing]="playing() === a.numberInSurah">
+          <div class="ayah" [id]="'a' + a.numberInSurah" [class.playing]="isPlaying(a.numberInSurah)" [class.say-tr]="isPlaying(a.numberInSurah) && player.phase() === 'translation'">
             <div class="d-flex align-items-center mb-2 gap-1">
               <span class="chip">{{ n() }}:{{ a.numberInSurah }}</span>
               <span class="flex-grow-1"></span>
-              <button class="icon-btn sm" (click)="playAyah(a.numberInSurah, a.number)" aria-label="Play ayah"><i class="bi" [class]="playing() === a.numberInSurah ? 'bi-pause-circle-fill' : 'bi-play-circle'"></i></button>
+              <button class="icon-btn sm" (click)="playAyah(a.numberInSurah)" aria-label="Play recitation of this ayah" title="Recitation"><i class="bi" [class]="isPlaying(a.numberInSurah, 'arabic') && player.status() !== 'paused' ? 'bi-pause-circle-fill' : 'bi-play-circle'"></i></button>
+              @if (s.s().showTranslation && d.translation[i]) {
+                <button class="icon-btn sm" (click)="playTranslation(a.numberInSurah)" aria-label="Listen to the translation of this ayah" title="Translation"><i class="bi" [class]="isPlaying(a.numberInSurah, 'translation') && player.status() !== 'paused' ? 'bi-pause-circle-fill' : 'bi-volume-up'"></i></button>
+              }
               <button class="icon-btn sm" [class.on]="isBm(a.numberInSurah)" (click)="toggleBm(a.numberInSurah)" aria-label="Bookmark"><i class="bi" [class]="isBm(a.numberInSurah) ? 'bi-bookmark-fill' : 'bi-bookmark'"></i></button>
               <button class="icon-btn sm" (click)="openMenu(a.numberInSurah)" aria-label="More"><i class="bi bi-three-dots-vertical"></i></button>
             </div>
@@ -154,6 +160,8 @@ export class QuranListPage {
       </div>
     } }
 
+    <app-ayah-player-bar />
+
     @if (sheet() === 'settings') {
       <app-sheet (closed)="sheet.set('')">
         <h6 class="mb-3">Reader settings</h6>
@@ -163,8 +171,10 @@ export class QuranListPage {
         <input type="range" class="form-range" min="12" max="26" [ngModel]="s.s().transSize" (ngModelChange)="s.patch({ transSize: +$event })" />
         <div class="form-check form-switch my-2"><input class="form-check-input" type="checkbox" id="tr" [ngModel]="s.s().showTranslation" (ngModelChange)="s.patch({ showTranslation: $event })" /><label class="form-check-label" for="tr">Show translation</label></div>
         <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="tl" [ngModel]="s.s().showTranslit" (ngModelChange)="s.patch({ showTranslit: $event })" /><label class="form-check-label" for="tl">Show transliteration</label></div>
+        <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="ta" [ngModel]="s.s().translationAudio" (ngModelChange)="player.setTranslationEnabled($event)" /><label class="form-check-label" for="ta">Speak the translation after each ayah</label></div>
+        <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="ra" [ngModel]="s.s().recitationAudio" (ngModelChange)="player.setRecitationEnabled($event)" /><label class="form-check-label" for="ra">Play the Arabic recitation of each ayah</label></div>
         <label class="small text-secondary mb-1">Translation</label>
-        <app-translation-picker (changed)="loadTranslation()" />
+        <app-translation-picker />
       </app-sheet>
     }
     @if (sheet() === 'menu' && sel()) {
@@ -194,6 +204,7 @@ export class QuranListPage {
     .bsm { color: var(--g-700); }
     .ayah { padding: 14px 16px; border-bottom: 1px solid var(--line); transition: background .3s; }
     .ayah.playing { background: var(--g-100); }
+    .ayah.say-tr .trans { background: var(--gold-soft); border-radius: 10px; padding: 6px 8px; margin-inline: -8px; }
     .icon-btn.sm { width: 32px; height: 32px; font-size: 17px; }
     .translit { color: var(--g-700); font-style: italic; margin-top: 6px; font-size: 14px; }
     .trans { margin-top: 8px; color: var(--text); opacity: .95; line-height: 1.6; }
@@ -221,28 +232,49 @@ export class QuranReaderPage implements OnDestroy {
   error = signal('');
   sheet = signal<'' | 'settings' | 'menu' | 'tafsir'>('');
   sel = signal(0);
-  playing = signal(0);
+  player = inject(AyahPlayerService);
   tafsirId = signal('ar.jalalayn');
   tafsirText = signal<string | null>(null);
   transDir = computed(() => this.ts.selected().dir);
-  private ayahAudio = new Audio();
   private scrollTo = 0;
+  /** Translation edition currently shown (it changes when the picker or the app language changes). */
+  private shownTr = '';
 
   constructor() {
+    // Keep the ayah that is being played in view.
+    effect(() => {
+      const a = this.player.ayah();
+      if (a && this.player.surah() === untracked(() => this.n()))
+        untracked(() => this.followAyah(a));
+    });
+    // Reload only the translation when the selection changes: picker, app language, or the catalogue arriving.
+    effect(() => { const id = this.ts.selectedId(); untracked(() => { if (this.data() && id !== this.shownTr) void this.loadTranslation(); }); });
     this.route.paramMap.subscribe(p => { this.n.set(+(p.get('n') ?? 1)); this.load(); });
     this.route.queryParamMap.subscribe(q => this.scrollTo = +(q.get('ayah') ?? 0));
-    this.ayahAudio.addEventListener('ended', () => this.nextAyah());
-    this.ayahAudio.addEventListener('error', () => { this.playing.set(0); this.toast.show('Unable to play audio. Check your connection.'); });
   }
 
   async load() {
-    this.loading.set(true); this.error.set(''); this.stopAyah();
+    this.loading.set(true); this.error.set(''); this.player.stop();
     try {
       this.transError.set('');
-      this.data.set(await this.quran.getSurah(this.n(), this.ts.selectedId()));
+      this.shownTr = this.ts.selectedId();
+      this.data.set(await this.quran.getSurah(this.n(), this.shownTr));
       this.loading.set(false);
       setTimeout(() => this.scroll(), 50);
     } catch { this.error.set('Could not load this surah. Check your connection.'); this.loading.set(false); }
+  }
+
+  /**
+   * Brings the ayah that has just started to the middle of the screen. It waits a moment so the player bar has been laid out
+   * (a scroll started before that is cancelled by the layout change), and jumps instead of gliding when the ayah is far away.
+   */
+  private followAyah(num: number) {
+    setTimeout(() => {
+      const el = (this.el.nativeElement as HTMLElement).querySelector('#a' + num);
+      if (!el || this.player.ayah() !== num) return;
+      const far = Math.abs(el.getBoundingClientRect().top - innerHeight / 2) > innerHeight * 1.5;
+      el.scrollIntoView({ block: 'center', behavior: far ? 'instant' : 'smooth' });
+    }, 80);
   }
 
   private scroll() {
@@ -266,8 +298,10 @@ export class QuranReaderPage implements OnDestroy {
     if (!this.data()) return;
     this.transLoading.set(true); this.transError.set('');
     try {
-      const t = await this.quran.translation(this.n(), this.ts.selectedId());
+      this.shownTr = this.ts.selectedId();
+      const t = await this.quran.translation(this.n(), this.shownTr);
       this.data.update(d => d && ({ ...d, translation: t }));
+      this.player.restart(this.content());
     } catch (e: any) { this.transError.set(e?.message ?? 'Could not load this translation. Check your connection.'); }
     this.transLoading.set(false);
   }
@@ -315,27 +349,42 @@ export class QuranReaderPage implements OnDestroy {
 
   playSurah() {
     const d = this.data(); if (!d) return;
-    this.stopAyah();
+    this.player.stop();
     this.audio.play(d.surah);
     this.toast.show('Playing surah recitation');
   }
 
-  playAyah(num: number, globalNum: number) {
-    if (this.playing() === num) { this.stopAyah(); return; }
-    this.audio.stop();
-    this.playing.set(num);
-    this.ayahAudio.src = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalNum}.mp3`;
-    this.ayahAudio.play().catch(() => {});
+  /** The ayahs with the exact translation text that is shown on screen. */
+  private content(): PlayerContent {
+    const d = this.data()!;
+    return {
+      surah: this.n(), lang: this.ts.selected().language,
+      ayahs: d.arabic.map((a, i) => ({ n: a.numberInSurah, global: a.number, translation: d.translation[i]?.text ?? '' })),
+    };
   }
-  private nextAyah() {
-    const d = this.data(); const cur = this.playing();
-    if (!d || !cur || cur >= d.arabic.length) { this.playing.set(0); return; }
-    const a = d.arabic[cur];
-    this.playing.set(a.numberInSurah);
-    this.ayahAudio.src = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${a.number}.mp3`;
-    this.ayahAudio.play().catch(() => {});
-    (this.el.nativeElement as HTMLElement).querySelector(`#a${a.numberInSurah}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+  isPlaying(num: number, phase?: 'arabic' | 'translation') {
+    return this.player.surah() === this.n() && this.player.ayah() === num && (!phase || this.player.phase() === phase);
   }
-  private stopAyah() { this.ayahAudio.pause(); this.playing.set(0); }
-  ngOnDestroy() { this.stopAyah(); }
+
+  /** Listen from the first ayah: recitation, then the spoken translation, ayah by ayah. */
+  listen() { if (this.data()) this.player.start(this.content(), 1); }
+
+  /** Play (or pause/resume) from an ayah. Uses the same player, with or without the spoken translation. */
+  playAyah(num: number) {
+    if (!this.data()) return;
+    if (this.isPlaying(num, 'arabic')) { this.player.toggle(); return; }
+    this.player.setRecitationEnabled(true);
+    this.player.start(this.content(), num, 'arabic');
+  }
+
+  /** Speak only this ayah's translation (then carry on as the switches in the player say). */
+  playTranslation(num: number) {
+    if (!this.data()) return;
+    if (this.isPlaying(num, 'translation')) { this.player.toggle(); return; }
+    this.player.setTranslationEnabled(true);
+    this.player.start(this.content(), num, 'translation');
+  }
+
+  ngOnDestroy() { this.player.stop(); }
 }

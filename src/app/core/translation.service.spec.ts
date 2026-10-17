@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { SettingsService } from './settings.service';
+import { idbDel } from './store';
 import { DEFAULT_TRANSLATION, TranslationService, URDU_TRANSLATORS, translatorById } from './translation.service';
 
 describe('TranslationService', () => {
@@ -51,5 +52,44 @@ describe('TranslationService', () => {
   it('falls back to the default when the saved id is no longer valid', () => {
     settings.patch({ translation: 'ur.dehlvi-abdulqadir' });
     expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);
+  });
+
+  it('loads the catalogue of translations, grouped by language, and can select one', async () => {
+    const data = [
+      { identifier: 'hi.hindi', language: 'hi', englishName: 'Suhel Farooq Khan and Saifur Rahman Nadwi', direction: 'ltr' },
+      { identifier: 'fa.makarem', language: 'fa', englishName: 'Naser Makarem Shirazi', direction: 'rtl' },
+      { identifier: 'ms.basmeih', language: 'ms', englishName: 'Abdullah Muhammad Basmeih', direction: 'ltr' },
+      { identifier: 'ur.ahmedali', language: 'ur', englishName: 'Ahmed Ali', direction: 'rtl' },
+    ];
+    spyOn(window, 'fetch').and.callFake(async () => new Response(JSON.stringify({ data })));
+    await idbDel('quran:catalog');                                       // do not reuse a catalogue cached by another test
+    await ts.loadCatalog();
+    const codes = ts.languages().map(l => l.code);
+    expect(codes).toEqual(jasmine.arrayContaining(['hi', 'fa', 'ms', 'en', 'fr']));
+    expect(codes).not.toContain('ur');                                   // Urdu has its own list
+    expect(ts.inLanguage('fa')[0]).toEqual(jasmine.objectContaining({ id: 'fa.makarem', dir: 'rtl', available: true }));
+    expect(ts.select('hi.hindi')).toBeTrue();
+    expect(ts.selected().language).toBe('hi');
+    expect(translatorById('ms.basmeih')?.name).toContain('Basmeih');
+    localStorage.removeItem('i360.translatorExtra');
+  });
+
+  it('shows the Quran translation in the app language, until another one is chosen', async () => {
+    const data = [{ identifier: 'hi.hindi', language: 'hi', englishName: 'Hindi', direction: 'ltr' }, { identifier: 'fa.ayati', language: 'fa', englishName: 'Ayati', direction: 'rtl' }];
+    spyOn(window, 'fetch').and.callFake(async () => new Response(JSON.stringify({ data })));
+    settings.patch({ lang: 'hi', translationAuto: true });
+    await idbDel('quran:catalog');                                       // do not reuse a catalogue cached by another test
+    await ts.loadCatalog();
+    expect(ts.selectedId()).toBe('hi.hindi');                            // follows the app language
+    settings.patch({ lang: 'fa' });
+    expect(ts.selectedId()).toBe('fa.ayati');
+    settings.patch({ lang: 'en' });
+    expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);                   // English keeps the saved translation
+    settings.patch({ lang: 'hi' });
+    expect(ts.select('en.sahih')).toBeTrue();                            // an explicit choice wins
+    expect(ts.selectedId()).toBe('en.sahih');
+    ts.followApp();
+    expect(ts.selectedId()).toBe('hi.hindi');
+    localStorage.removeItem('i360.translatorExtra');
   });
 });

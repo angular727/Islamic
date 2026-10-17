@@ -9,7 +9,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     // Load the saved translations of the chosen language first, so the first screen already appears translated.
     provideAppInitializer(() => inject(TranslateService).load()),
-    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top' })), provideServiceWorker('ngsw-worker.js', {
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top' })), provideServiceWorker('sw-custom.js', {
             enabled: !isDevMode(),
             registrationStrategy: 'registerWhenStable:30000'
           }),
