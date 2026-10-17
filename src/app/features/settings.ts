@@ -10,7 +10,8 @@ import { NotifyService } from '../core/notify.service';
 import { METHODS } from '../core/prayer.service';
 import { QuranService, TRANSLATIONS } from '../core/quran.service';
 import { TranslationPickerComponent } from '../shared/translation-picker';
-import { AzanMode, PRAYERS, SettingsService } from '../core/settings.service';
+import { PRAYERS, SettingsService } from '../core/settings.service';
+import { AlertSettingsComponent } from '../shared/alert-settings';
 import { ToastService } from '../core/toast.service';
 import { UserDataService } from '../core/user-data.service';
 import { LockService } from '../core/lock.service';
@@ -47,7 +48,7 @@ export class ThemesPage {
 
 @Component({
   selector: 'app-settings',
-  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SheetComponent, TranslationPickerComponent],
+  imports: [RouterLink, FormsModule, TPipe, HeaderComponent, SheetComponent, TranslationPickerComponent, AlertSettingsComponent],
   template: `
     <app-header [title]="'settings' | t" />
     <div class="pad">
@@ -80,22 +81,7 @@ export class ThemesPage {
       </div>
 
       <div class="section-title">{{ 'notifications' | t }}</div>
-      <div class="card-i">
-        @for (k of keys; track k) {
-          <div class="d-flex align-items-center mb-2"><span class="flex-grow-1">{{ k | t }}</span>
-            <select class="form-select form-select-sm w-auto" [ngModel]="s.s().azan[k]" (ngModelChange)="setAzan(k, $event)">
-              <option value="azan">Sound + notification</option><option value="silent">Notification only</option><option value="off">Off</option></select></div>
-        }
-        <label class="small text-secondary mt-2">Reminder before prayer</label>
-        <select class="form-select mb-3" [ngModel]="s.s().preReminder" (ngModelChange)="s.patch({ preReminder: +$event })">
-          @for (m of [0, 5, 10, 15, 20, 30]; track m) { <option [ngValue]="m">{{ m ? m + ' minutes before' : 'Off' }}</option> }
-        </select>
-        <div class="d-flex gap-2">
-          <button class="btn-i outline sm flex-fill" (click)="askPerm()"><i class="bi bi-bell"></i> {{ notify.permission === 'granted' ? 'Enabled' : 'Allow' }}</button>
-          <button class="btn-i outline sm flex-fill" (click)="notify.test()">Test sound</button>
-        </div>
-        <div class="small text-secondary mt-2">Alerts fire while Islam is open in your browser.</div>
-      </div>
+      <app-alert-settings />
 
       <div class="section-title">General</div>
       <div class="list-i">
@@ -160,8 +146,6 @@ export class SettingsPage {
   langLabel = computed(() => this.languages.current().native);
 
   adjust(k: (typeof PRAYERS)[number], v: number) { this.s.patch({ adjustments: { ...this.s.s().adjustments, [k]: Math.max(-30, Math.min(30, +v || 0)) } }); }
-  setAzan(k: (typeof PRAYERS)[number], v: AzanMode) { this.s.patch({ azan: { ...this.s.s().azan, [k]: v } }); }
-  async askPerm() { this.toast.show((await this.notify.requestPermission()) ? 'Notifications enabled' : 'Notifications are blocked in your browser'); }
   async savePin() { await this.lock.setPin(this.pin); this.pin = ''; this.sheet.set(''); this.toast.show('PIN set'); }
   removePin() { this.lock.clear(); this.toast.show('PIN removed'); }
   backup() {
@@ -251,7 +235,7 @@ export class DownloadsPage {
 export class HelpPage {
   faqs = [
     { q: 'Why are my prayer times wrong?', a: 'Set your location (Settings → Location) and choose the calculation method used in your region. You can fine-tune each prayer by a few minutes.' },
-    { q: 'How do Azan alerts work?', a: 'Alerts play a chime and show a notification while Islam is open. Allow notifications in the browser when asked.' },
+    { q: 'How do Azan alerts work?', a: 'Notifications and alarms are separate. Turn each on in Settings, choose how many minutes before each prayer, and allow notifications when asked. They work while Islam is open or installed as an app; browsers cannot run alerts for a fully closed app, so you can also add the alarms to your phone calendar.' },
     { q: 'Does the app work offline?', a: 'Prayer times, Qibla, Duas, Tasbeeh and the Calendar work offline. Download Quran text and audio from More → Downloads. Hadith chapters you open are cached.' },
     { q: 'The Qibla compass does not move.', a: 'Live compass needs a device with a magnetometer and permission for motion sensors. On desktops the dial shows the Qibla bearing from North.' },
     { q: 'How do I back up my data?', a: 'Settings → Privacy & Security → Backup saves your bookmarks, notes and settings as a JSON file you can restore later.' },

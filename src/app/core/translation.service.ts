@@ -1,5 +1,7 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { baseLang } from './lang-utils';
 import { SettingsService } from './settings.service';
+import { idbGet, idbSet, lsGet, lsSet } from './store';
 
 export type TranslationSource = 'alquran' | 'fawaz';
 
@@ -8,7 +10,8 @@ export interface Translator {
   id: string;
   /** Translator's name in English and Urdu, and the title of the translation. */
   name: string; urduName: string; title: string;
-  language: 'ur' | 'en' | 'bn' | 'tr' | 'fr';
+  /** ISO 639 language code, e.g. "ur", "hi", "fa". */
+  language: string;
   dir: 'rtl' | 'ltr';
   source?: TranslationSource;
   /** Short note about the source, shown in the picker. */
@@ -48,7 +51,27 @@ export const OTHER_TRANSLATORS: Translator[] = [
 export const ALL_TRANSLATORS: Translator[] = [...URDU_TRANSLATORS, ...OTHER_TRANSLATORS];
 export const DEFAULT_TRANSLATION = 'ur.jalandhry';
 
-export const translatorById = (id: string) => ALL_TRANSLATORS.find(t => t.id === id);
+/** Editions from the AlQuran Cloud catalogue (Tanzil and others), added once the catalogue is loaded or a choice is restored. */
+const EXTRA = new Map<string, Translator>();
+export const translatorById = (id: string) => ALL_TRANSLATORS.find(t => t.id === id) ?? EXTRA.get(id);
+
+const ODD_CODES: Record<string, string> = { ba: 'Bosnian', ce: 'Chechen', ber: 'Berber' };
+
+/** Name of a language in itself ("हिन्दी") and in English ("Hindi"). */
+export function languageNames(code: string): { native: string; english: string } {
+  const odd = ODD_CODES[code];                       // codes the catalogue uses that are not standard language codes
+  if (odd) return { native: odd, english: odd };
+  const of = (loc: string) => { try { return new Intl.DisplayNames([loc], { type: 'language' }).of(code) ?? code; } catch { return code; } };
+  return { native: of(code), english: of('en') };
+}
+
+interface CatalogEdition { identifier: string; language: string; englishName: string; direction: string | null }
+const CATALOG = 'https://api.alquran.cloud/v1/edition?format=text&type=translation';
+const CATALOG_DAYS = 14;
+const toTranslator = (e: CatalogEdition): Translator => ({
+  id: e.identifier, name: e.englishName, urduName: '', title: languageNames(e.language).native, language: e.language,
+  dir: e.direction === 'rtl' ? 'rtl' : 'ltr', source: 'alquran', sourceLabel: ALQURAN, available: true,
+});
 
 /** Short label such as "Fateh Muhammad Jalandhari – Aasan Urdu Translation". */
 export const translatorLabel = (t: Translator) => t.language === 'ur' ? `${t.name.replace('Maulana ', '').replace('Mufti ', '')} – ${t.title}` : `${t.title} – ${t.name}`;
@@ -63,8 +86,70 @@ export class TranslationService {
 
   readonly urdu = URDU_TRANSLATORS;
   readonly others = OTHER_TRANSLATORS;
+  /** Every other translation the catalogue offers, grouped by language (Urdu is listed above). Empty until loaded. */
+  readonly catalog = signal<Translator[]>([]);
+  readonly catalogError = signal(false);
+  readonly languages = computed(() => {
+    const codes = [...new Set([...OTHER_TRANSLATORS, ...this.catalog()].map(t => t.language))];
+    return codes.map(code => ({ code, ...languageNames(code) })).sort((a, b) => a.english.localeCompare(b.english));
+  });
+
+  constructor() {
+    // Restore a previously chosen catalogue edition straight away, before the catalogue itself is loaded.
+    const saved = lsGet<Translator | null>('i360.translatorExtra', null);
+    if (saved?.id) EXTRA.set(saved.id, saved);
+    // The catalogue is needed as soon as the app is in a language that may have its own translation.
+    effect(() => { if (this.followCode()) untracked(() => void this.loadCatalog()); });
+  }
+
+  /** The app language when the Quran translation should follow it (not English or Urdu, which keep the saved choice). */
+  private followCode = computed(() => {
+    const s = this.settings.s(); const code = baseLang(s.lang);
+    return s.translationAuto && code !== 'en' && code !== 'ur' ? code : '';
+  });
+
+  /** The translation chosen automatically for the app language, if the catalogue has one. */
+  readonly autoPick = computed(() => { const c = this.followCode(); return c ? this.inLanguage(c)[0] : undefined; });
+  /** True when the app language has translations, so "follow the app language" can be offered. */
+  readonly appLanguageHasTranslation = computed(() => { const c = baseLang(this.settings.s().lang); return c !== 'en' && c !== 'ur' && this.inLanguage(c).length > 0; });
+  readonly following = computed(() => !!this.autoPick());
+
+  /** Go back to showing the translation in the app's language. */
+  followApp() { this.settings.patch({ translationAuto: true }); }
+
+  /** Loads the list of available translations (cached for two weeks; the cached copy is used if the network fails). */
+  private loading?: Promise<void>;
+  loadCatalog(): Promise<void> {
+    if (this.catalog().length) return Promise.resolve();
+    return this.loading ??= this.fetchCatalog().finally(() => (this.loading = undefined));
+  }
+
+  private async fetchCatalog() {
+    this.catalogError.set(false);
+    try {
+      const cached = await idbGet<{ at: number; list: CatalogEdition[] }>('quran:catalog');
+      let list = cached && Date.now() - cached.at < CATALOG_DAYS * 864e5 ? cached.list : undefined;
+      if (!list) {
+        try {
+          const r = await fetch(CATALOG);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          list = ((await r.json()).data as CatalogEdition[]);
+          await idbSet('quran:catalog', { at: Date.now(), list });
+        } catch (e) { if (!cached) throw e; list = cached.list; }
+      }
+      const known = new Set(ALL_TRANSLATORS.map(t => t.id));
+      const extra = list.filter(e => e.language !== 'ur' && e.language !== 'ar' && e.identifier && !known.has(e.identifier)).map(toTranslator);
+      extra.forEach(t => EXTRA.set(t.id, t));
+      this.catalog.set(extra);
+    } catch { this.catalogError.set(true); }
+  }
+
+  /** Editions in one language: the built-in ones first, then the catalogue's. */
+  inLanguage(code: string) { return [...OTHER_TRANSLATORS, ...this.catalog()].filter(t => t.language === code); }
 
   readonly selectedId = computed(() => {
+    const auto = this.autoPick();
+    if (auto) return auto.id;
     const t = translatorById(this.settings.s().translation);
     return t?.available ? t.id : DEFAULT_TRANSLATION;
   });
@@ -75,7 +160,8 @@ export class TranslationService {
   select(id: string): boolean {
     const t = translatorById(id);
     if (!t?.available) return false;
-    this.settings.patch({ translation: id });
+    this.settings.patch({ translation: id, translationAuto: false });   // an explicit choice stops following the app language
+    if (EXTRA.has(id)) lsSet('i360.translatorExtra', EXTRA.get(id)!);
     return true;
   }
 }

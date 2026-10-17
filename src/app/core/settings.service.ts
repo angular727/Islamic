@@ -5,7 +5,16 @@ import { lsGet, lsSet } from './store';
 
 export interface Loc { name: string; lat: number; lng: number; tz?: string; auto?: boolean }
 export type Madhab = 'hanafi' | 'shafi' | 'maliki' | 'hanbali' | 'other';
-export type AzanMode = 'azan' | 'silent' | 'off';
+export const FIVE = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+export type FivePrayer = typeof FIVE[number];
+export type AlarmSound = 'chime' | 'bell' | 'beep' | 'soft';
+export const ALARM_SOUNDS: { id: AlarmSound; label: string }[] = [
+  { id: 'chime', label: 'Chime' }, { id: 'bell', label: 'Bell' }, { id: 'soft', label: 'Soft tone' }, { id: 'beep', label: 'Beep' },
+];
+/** A notification for one prayer: `before` minutes ahead of the prayer time (0 = at the prayer time). */
+export interface PrayerNotify { on: boolean; before: number }
+/** An alarm for one prayer. Alarms and notifications are completely separate settings. */
+export interface PrayerAlarm { on: boolean; before: number; sound: AlarmSound }
 export const PRAYERS = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
 export type PrayerKey = typeof PRAYERS[number];
 
@@ -18,12 +27,19 @@ export interface Settings {
   accent: 'green' | 'teal' | 'gold';
   method: string;
   adjustments: Record<PrayerKey, number>;
-  azan: Record<PrayerKey, AzanMode>;
-  preReminder: number;
+  /** Master switches: notifications and alarms can each be on while the other is off. */
+  notifications: boolean;
+  notifyPrayer: Record<FivePrayer, PrayerNotify>;
+  alarms: boolean;
+  alarmPrayer: Record<FivePrayer, PrayerAlarm>;
+  /** Minutes an alarm is postponed by "Snooze". */
+  snooze: number;
   location: Loc | null;
   savedLocations: Loc[];
   hijriAdjust: number;
   translation: string;
+  /** Show the Quran translation in the app's language when one exists (any language other than English and Urdu). */
+  translationAuto: boolean;
   showTranslation: boolean;
   showTranslit: boolean;
   arabicSize: number;
@@ -34,23 +50,52 @@ export interface Settings {
   analytics: boolean;
   /** Also machine-translate teaching text (lessons). Quran, Hadith and Dua texts are never machine-translated. */
   translateContent: boolean;
+  /** Speak the translation after each ayah when listening ayah by ayah. */
+  translationAudio: boolean;
+  /** Play the Arabic recitation of each ayah in the ayah player (at least one of recitation / translation stays on). */
+  recitationAudio: boolean;
+  /** Hadith translation language as an edition prefix ("urd", "eng"…), "ara" for Arabic only, "" to follow the app language. */
+  hadithLang: string;
+  /** Speed of the spoken translation and of the ayah recitation in the ayah player. */
+  ttsRate: number;
 }
 
 export const DEFAULTS: Settings = {
   onboarded: false, name: 'Guest', lang: 'en', madhab: 'hanafi', theme: 'light', accent: 'green',
   method: 'MuslimWorldLeague',
   adjustments: { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
-  azan: { fajr: 'azan', sunrise: 'off', dhuhr: 'azan', asr: 'azan', maghrib: 'azan', isha: 'azan' },
-  preReminder: 0, location: null, savedLocations: [], hijriAdjust: 0,
+  notifications: false,
+  notifyPrayer: Object.fromEntries(FIVE.map(k => [k, { on: true, before: 10 }])) as Record<FivePrayer, PrayerNotify>,
+  alarms: false,
+  alarmPrayer: Object.fromEntries(FIVE.map(k => [k, { on: true, before: 0, sound: 'chime' }])) as Record<FivePrayer, PrayerAlarm>,
+  snooze: 10,
+  location: null, savedLocations: [], hijriAdjust: 0,
   translation: 'ur.jalandhry', showTranslation: true, showTranslit: false, arabicSize: 30, transSize: 16,
-  haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: false,
+  haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: false, translationAuto: true, translationAudio: true, recitationAudio: true, ttsRate: 1, hadithLang: '',
 };
+
+/**
+ * Merges saved settings with the defaults. Settings saved by the older version (one "azan" mode per prayer and a single
+ * reminder time) are converted once into the separate notification and alarm settings, so nobody loses their choices.
+ */
+export function loadSettings(saved: Record<string, any>): Settings {
+  const { azan, preReminder, ...rest } = saved;
+  const out = { ...DEFAULTS, ...rest } as Settings;
+  if (azan && !rest['notifyPrayer']) {
+    const before = Number(preReminder) || 0;
+    out.notifyPrayer = Object.fromEntries(FIVE.map(k => [k, { on: azan[k] !== 'off', before }])) as Record<FivePrayer, PrayerNotify>;
+    out.alarmPrayer = Object.fromEntries(FIVE.map(k => [k, { on: azan[k] === 'azan', before: 0, sound: 'chime' }])) as Record<FivePrayer, PrayerAlarm>;
+    out.notifications = FIVE.some(k => azan[k] !== 'off');
+    out.alarms = FIVE.some(k => azan[k] === 'azan');
+  }
+  return out;
+}
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   /** True on the very first visit (nothing saved yet); used to pick a default language. */
   readonly firstRun = !lsGet<unknown>('i360.settings', null);
-  readonly s = signal<Settings>({ ...DEFAULTS, ...lsGet<Partial<Settings>>('i360.settings', {}) });
+  readonly s = signal<Settings>(loadSettings(lsGet<Record<string, any>>('i360.settings', {})));
 
   constructor() {
     effect(() => { lsSet('i360.settings', this.s()); this.applyTheme(); });

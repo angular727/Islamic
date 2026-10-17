@@ -9,17 +9,19 @@ import { TranslateService } from './core/translate.service';
 import { NotifyService } from './core/notify.service';
 import { SettingsService } from './core/settings.service';
 import { ToastService } from './core/toast.service';
+import { AlarmOverlayComponent } from './shared/alarm-overlay';
 import { MiniPlayerComponent } from './shared/mini-player';
 
 const TABS = ['/home', '/library', '/ibadaat', '/search', '/more'];
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, MiniPlayerComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, MiniPlayerComponent, AlarmOverlayComponent],
   template: `
     <div class="phone">
       <main class="screen"><router-outlet /></main>
       <app-mini-player />
+      <app-alarm-overlay />
       @if (showNav()) {
         <nav class="bottom-nav">
           <a routerLink="/home" routerLinkActive="active"><i class="bi bi-house-door-fill"></i>{{ 'home' | t }}</a>

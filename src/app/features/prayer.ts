@@ -6,7 +6,7 @@ import { HIJRI_MONTHS, toHijri } from '../core/hijri';
 import { LocationService } from '../core/location.service';
 import { NotifyService } from '../core/notify.service';
 import { PrayerService } from '../core/prayer.service';
-import { AzanMode, Loc, PRAYERS, PrayerKey, SettingsService } from '../core/settings.service';
+import { FIVE, FivePrayer, Loc, PRAYERS, PrayerKey, SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
 import { HeaderComponent, SheetComponent } from '../shared/ui';
 
@@ -46,18 +46,18 @@ import { HeaderComponent, SheetComponent } from '../shared/ui';
               <div class="ic"><i class="bi" [class]="icons[k]"></i></div>
               <div class="grow t">{{ k | t }}</div>
               <div class="fw-semibold me-2" style="font-variant-numeric: tabular-nums">{{ p.fmt(p.today()[k]) }}</div>
-              <button class="icon-btn" (click)="cycle(k)" [attr.aria-label]="'Alert: ' + s.s().azan[k]">
-                <i class="bi" [class]="alertIcon(s.s().azan[k])"></i></button>
+              @if (isFive(k)) {
+                <button class="icon-btn" (click)="notify.togglePrayerNotify(asFive(k))" [attr.aria-label]="name(k) + ' notification ' + (on(k) ? 'on' : 'off')" [attr.aria-pressed]="on(k)">
+                  <i class="bi" [class]="on(k) ? 'bi-bell-fill text-success' : 'bi-bell-slash text-secondary'"></i></button>
+                <button class="icon-btn" (click)="notify.togglePrayerAlarm(asFive(k))" [attr.aria-label]="name(k) + ' alarm ' + (alarmOn(k) ? 'on' : 'off')" [attr.aria-pressed]="alarmOn(k)">
+                  <i class="bi" [class]="alarmOn(k) ? 'bi-alarm-fill text-success' : 'bi-alarm text-secondary'"></i></button>
+              }
             </div>
           }
         </div>
-        <div class="small text-secondary mt-2 px-1">Alert icon: <i class="bi bi-volume-up-fill"></i> sound + notification ·
-          <i class="bi bi-bell-fill"></i> notification only · <i class="bi bi-bell-slash"></i> off. Alerts fire while the app is open.</div>
-
-        @if (notify.permission !== 'granted') {
-          <button class="btn-i outline mt-3" (click)="askPerm()"><i class="bi bi-bell"></i> Enable browser notifications</button>
-        }
-        <button class="btn-i ghost mt-1" (click)="notify.test()">Test Azan alert</button>
+        <div class="small text-secondary mt-2 px-1"><i class="bi bi-bell-fill"></i> notification · <i class="bi bi-alarm-fill"></i> alarm. Each prayer has its own switches.
+          <a routerLink="/settings" fragment="alerts">Notification and alarm settings</a></div>
+        @if (notify.state() === 'denied') { <div class="small text-danger px-1 mt-1">Notifications are blocked in your browser. Open the settings above for the steps to allow them.</div> }
       } @else {
         <div class="d-flex align-items-center justify-content-between mb-2">
           <button class="icon-btn" (click)="shift(-1)"><i class="bi bi-chevron-left"></i></button>
@@ -142,17 +142,11 @@ export class PrayerTimesPage {
   monthLabel = computed(() => this.base().toLocaleDateString([], { month: 'long', year: 'numeric' }));
   rows = computed(() => { this.s.s(); this.loc.loc(); return this.p.month(this.base().getFullYear(), this.base().getMonth()); });
 
-  alertIcon(m: AzanMode) { return m === 'azan' ? 'bi-volume-up-fill text-success' : m === 'silent' ? 'bi-bell-fill text-success' : 'bi-bell-slash text-secondary'; }
-  cycle(k: PrayerKey) {
-    const order: AzanMode[] = ['azan', 'silent', 'off'];
-    const next = order[(order.indexOf(this.s.s().azan[k]) + 1) % 3];
-    this.s.patch({ azan: { ...this.s.s().azan, [k]: next } });
-    if (next !== 'off' && this.notify.permission === 'default') this.askPerm();
-  }
-  async askPerm() {
-    const ok = await this.notify.requestPermission();
-    this.toast.show(ok ? 'Notifications enabled' : 'Notifications are blocked in your browser settings');
-  }
+  isFive(k: string) { return (FIVE as readonly string[]).includes(k); }
+  asFive(k: string) { return k as FivePrayer; }
+  name(k: string) { return this.notify.label(k as FivePrayer); }
+  on(k: string) { const s = this.s.s(); return s.notifications && s.notifyPrayer[k as FivePrayer].on; }
+  alarmOn(k: string) { const s = this.s.s(); return s.alarms && s.alarmPrayer[k as FivePrayer].on; }
   shift(n: number) { this.monthOffset.update(v => v + n); }
   isToday(d: Date) { return d.toDateString() === new Date().toDateString(); }
   shortTime(d: Date) { return this.p.fmt24(d); }

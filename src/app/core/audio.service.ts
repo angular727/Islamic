@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { RECITERS, Reciter, surahUrl } from '../data/reciters';
+import { PlaybackHub } from './playback-hub';
 import { QuranService, Surah } from './quran.service';
 import { lsGet, lsSet } from './store';
 
@@ -9,6 +10,7 @@ const CACHE = 'i360-audio';
 @Injectable({ providedIn: 'root' })
 export class AudioService {
   private quran = inject(QuranService);
+  private hub = inject(PlaybackHub);
   private el = new Audio();
 
   readonly reciter = signal<Reciter>(RECITERS.find(r => r.id === lsGet('i360.reciter', 'alafasy')) ?? RECITERS[0]);
@@ -30,6 +32,7 @@ export class AudioService {
   private objectUrl?: string;
 
   constructor() {
+    this.hub.register('surah', () => this.stop());
     const a = this.el;
     a.preload = 'none';
     a.addEventListener('timeupdate', () => this.current.set(a.currentTime));
@@ -46,6 +49,7 @@ export class AudioService {
   setReciter(r: Reciter) { this.reciter.set(r); lsSet('i360.reciter', r.id); }
 
   async play(s: Surah, reciter = this.reciter()) {
+    this.hub.claim('surah');                           // stop the ayah player and Hadith audio first
     this.error.set('');
     this.setReciter(reciter);
     this.surah.set(s);
