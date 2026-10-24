@@ -85,8 +85,10 @@ describe('CloudTtsProvider', () => {
     const p = new CloudTtsProvider('test-key');
     const first = await p.audioFor(text, 'ur');
     const second = await p.audioFor(text, 'ur');
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const body = JSON.parse((fetchSpy.calls.mostRecent().args[1] as RequestInit).body as string);
+    // Only the speech requests count: background fetches from other services must not affect this test.
+    const speech = fetchSpy.calls.allArgs().filter(a => String(a[0]).includes('texttospeech'));
+    expect(speech.length).toBe(1);
+    const body = JSON.parse((speech[0][1] as RequestInit).body as string);
     expect(body.input.text).toBe(text);
     expect(body.voice.languageCode).toBe('ur-IN');
     expect(await new Response(first).text()).toBe('fake-mp3-bytes');

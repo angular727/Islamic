@@ -16,6 +16,8 @@ export interface Translator {
   source?: TranslationSource;
   /** Short note about the source, shown in the picker. */
   sourceLabel?: string;
+  /** For a translation of an Urdu scholar's work in another language: the id of that scholar's Urdu translation. */
+  scholar?: string;
   available: boolean;
   /** Why a translation cannot be selected yet. */
   reason?: string;
@@ -48,7 +50,18 @@ export const OTHER_TRANSLATORS: Translator[] = [
   { id: 'fr.hamidullah', name: 'Hamidullah', urduName: '', title: 'Français', language: 'fr', dir: 'ltr', source: 'alquran', sourceLabel: ALQURAN, available: true },
 ];
 
-export const ALL_TRANSLATORS: Translator[] = [...URDU_TRANSLATORS, ...OTHER_TRANSLATORS];
+/**
+ * The same scholar's own translation in another language, where one is published in the sources used. Nothing here is
+ * machine-translated: each entry is a separate published edition by that scholar, and a scholar with no entry is simply
+ * available in one language only.
+ */
+export const SCHOLAR_EDITIONS: Translator[] = [
+  { id: 'en.maududi', name: "Maulana Abul A'la Maududi", urduName: '', title: 'English', language: 'en', dir: 'ltr', scholar: 'ur.maududi', source: 'alquran', sourceLabel: ALQURAN, available: true },
+  { id: 'en.ahmedraza', name: 'Maulana Ahmad Raza Khan Barelvi', urduName: '', title: 'English', language: 'en', dir: 'ltr', scholar: 'ur.kanzuliman', source: 'alquran', sourceLabel: ALQURAN, available: true },
+  { id: 'fz.eng-muftitaqiusmani', name: 'Mufti Muhammad Taqi Usmani', urduName: '', title: 'English', language: 'en', dir: 'ltr', scholar: 'fz.urd-muhammadtaqiusm', source: 'fawaz', sourceLabel: FAWAZ, available: true },
+];
+
+export const ALL_TRANSLATORS: Translator[] = [...URDU_TRANSLATORS, ...OTHER_TRANSLATORS, ...SCHOLAR_EDITIONS];
 export const DEFAULT_TRANSLATION = 'ur.jalandhry';
 
 /** Editions from the AlQuran Cloud catalogue (Tanzil and others), added once the catalogue is loaded or a choice is restored. */
@@ -109,7 +122,13 @@ export class TranslationService {
   });
 
   /** The translation chosen automatically for the app language, if the catalogue has one. */
-  readonly autoPick = computed(() => { const c = this.followCode(); return c ? this.inLanguage(c)[0] : undefined; });
+  readonly autoPick = computed(() => {
+    const c = this.followCode(); if (!c) return undefined;
+    // Keep the same scholar when that scholar's own translation exists in the app language.
+    const key = this.scholarKeyOf(this.settings.s().translation);
+    return (key ? this.scholarLanguages(key).find(t => t.language === c) : undefined) ?? this.inLanguage(c)[0];
+  });
+  private scholarKeyOf(id: string) { const t = translatorById(id); const k = t?.scholar ?? t?.id ?? ''; return URDU_TRANSLATORS.some(u => u.id === k) ? k : ''; }
   /** True when the app language has translations, so "follow the app language" can be offered. */
   readonly appLanguageHasTranslation = computed(() => { const c = baseLang(this.settings.s().lang); return c !== 'en' && c !== 'ur' && this.inLanguage(c).length > 0; });
   readonly following = computed(() => !!this.autoPick());
@@ -144,8 +163,20 @@ export class TranslationService {
     } catch { this.catalogError.set(true); }
   }
 
-  /** Editions in one language: the built-in ones first, then the catalogue's. */
-  inLanguage(code: string) { return [...OTHER_TRANSLATORS, ...this.catalog()].filter(t => t.language === code); }
+  /** Editions in one language: the built-in ones first, then the catalogue's (each edition once). */
+  inLanguage(code: string) {
+    const seen = new Set<string>();
+    return [...OTHER_TRANSLATORS, ...SCHOLAR_EDITIONS, ...this.catalog()].filter(t => t.language === code && !seen.has(t.id) && !!seen.add(t.id));
+  }
+
+  /** The Urdu scholar whose work is currently shown (in any language), or '' when the selection is another translator. */
+  readonly scholarKey = computed(() => { const t = this.selected(); const k = t.scholar ?? t.id; return URDU_TRANSLATORS.some(u => u.id === k && u.available) ? k : ''; });
+
+  /** One scholar's available translations, one per language: the original Urdu first, then the other languages published. */
+  scholarLanguages(key: string): Translator[] {
+    const base = URDU_TRANSLATORS.find(t => t.id === key && t.available);
+    return base ? [base, ...SCHOLAR_EDITIONS.filter(t => t.scholar === key)] : [];
+  }
 
   readonly selectedId = computed(() => {
     const auto = this.autoPick();

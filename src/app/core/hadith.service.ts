@@ -47,6 +47,12 @@ export const COLLECTIONS: { key: string; title: string; arabic: string; blurb: s
   { key: 'qudsi', title: '40 Hadith Qudsi', arabic: 'الأربعون القدسية', blurb: 'Sacred Hadith' },
 ];
 
+/** The hadith of the day is taken from the two Sahih collections, which are the most authentic. */
+const DAILY_BOOKS = ['bukhari', 'muslim'] as const;
+const DAILY_MAX_ARABIC = 650;                    // a short hadith fits a home-screen card
+
+export interface DailyHadith { hadith: Hadith; /** Collection key, e.g. "bukhari". */ key: string; collection: string; translation: HadithTranslation | null }
+
 const CDN = 'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1';
 const EDITIONS_TTL = 14 * 864e5;
 
@@ -139,6 +145,37 @@ export class HadithService {
    * The hadiths of a chapter. The Arabic always comes from the Arabic edition and is never altered; the translation is
    * joined to it by hadith number, so each translation sits next to the hadith it translates.
    */
+  /**
+   * The hadith of the day: the same one all day, a different one each day, from Sahih al-Bukhari or Sahih Muslim. The
+   * Arabic is the original text and the translation is the published edition for the reader's language (never machine
+   * translated). Very long hadith are skipped so the card stays short.
+   */
+  async daily(date = new Date()): Promise<DailyHadith> {
+    const day = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 864e5);
+    const key = DAILY_BOOKS[(day + date.getFullYear()) % DAILY_BOOKS.length];
+    const book = await this.book(key);
+    const secs = book.sections.filter(s => s.first != null && s.last != null);
+    const max = Math.max(...secs.map(s => s.last!));
+    const { translation } = await this.resolve(key);
+    const collection = COLLECTIONS.find(c => c.key === key)!.title;
+    for (let i = 0; i < 25; i++) {
+      const n = ((day * 97 + date.getFullYear() * 31 + i * 13) % max) + 1;
+      const sec = secs.find(s => n >= s.first! && n <= s.last!);
+      if (!sec) continue;
+      const page = await this.hadiths(key, sec.id, translation);
+      const h = page.hadiths.find(x => x.number === n);
+      if (h && this.isStandalone(h, !!translation)) return { hadith: h, key, collection, translation };
+    }
+    throw new Error('The hadith of the day could not be loaded.');
+  }
+
+  /** A hadith that reads well on its own: not too long, and not just a chain of narrators or "a hadith like the one before". */
+  private isStandalone(h: Hadith, withTranslation: boolean): boolean {
+    if (!h.arabic || h.arabic.length < 100 || h.arabic.length > DAILY_MAX_ARABIC) return false;
+    if (!withTranslation) return true;
+    return !h.missing && h.text.length >= 100 && !/\b(like it|similar to|same (chain|narration|words)|in the same way|a hadith like)\b/i.test(h.text);
+  }
+
   async hadiths(key: string, sec: number, translation: HadithTranslation | null): Promise<HadithPage> {
     const [ar, tr] = await Promise.all([
       this.section(`ara-${key}`, sec),

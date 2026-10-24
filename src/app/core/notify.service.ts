@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { AlarmService } from './alarm.service';
 import { AlertEvent, buildIcs, buildSchedule, dueAlerts } from './alert-schedule';
+import { EventAlert, dueEventAlerts, eventAlerts } from './islamic-events';
 import { PrayerService } from './prayer.service';
 import { FIVE, FivePrayer, SettingsService } from './settings.service';
 import { lsGet, lsSet } from './store';
@@ -49,6 +50,9 @@ export class NotifyService {
     const from = new Date(this.day()); from.setDate(from.getDate() - 1);   // yesterday too: its Isha may still be pending near midnight
     return buildSchedule(this.settings.s(), d => this.prayer.times(d), from, 3);
   });
+
+  /** Reminders for Islamic events (Ramadan, Eids, Ashura…) in the coming weeks, rebuilt when settings or the day change. */
+  readonly eventPlan = computed<EventAlert[]>(() => eventAlerts(this.settings.s(), new Date(this.day())));
 
   /** What this browser can and cannot do, shown to the person. */
   readonly background = computed(() => {
@@ -140,7 +144,7 @@ export class NotifyService {
   // ------------------------------------------------------------------ scheduler
   constructor() {
     // A change of settings, location, calculation method or day rebuilds the plan; wake up for the new next alert.
-    effect(() => { this.plan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); } }); });
+    effect(() => { this.plan(); this.eventPlan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); } }); });
   }
 
   start() {
@@ -149,7 +153,12 @@ export class NotifyService {
     const wake = () => { this.refresh(); this.check(); this.rearm(); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
     addEventListener('focus', wake); addEventListener('online', wake);
-    addEventListener('pointerdown', () => this.alarm.unlock(), { once: true });
+    // Browsers only show the permission prompt in response to a tap or click, so ask on the first one (once; never after a refusal).
+    addEventListener('pointerdown', () => {
+      this.alarm.unlock();
+      const s = this.settings.s();
+      if ((s.notifications || s.islamicEvents) && this.state() === 'default') void this.ask();
+    }, { once: true });
     try { navigator.permissions?.query({ name: 'notifications' as PermissionName }).then(p => { p.onchange = () => this.refresh(); }); } catch { /* not supported */ }
     navigator.serviceWorker?.addEventListener('message', e => this.onWorkerMessage(e.data));
     this.handleLaunch();
@@ -167,6 +176,18 @@ export class NotifyService {
 
   private pending() { return [...this.plan(), ...this.snoozes()].sort((a, b) => a.at - b.at); }
 
+  /** Turns Islamic event notifications on or off (asking for permission when switching on). */
+  async setIslamicEvents(on: boolean): Promise<boolean> {
+    if (!on) { this.settings.patch({ islamicEvents: false }); return true; }
+    const st = await this.ask();
+    if (st !== 'granted') { this.toast.show(this.blockedMessage(st), 5000); return false; }
+    this.settings.patch({ islamicEvents: true });
+    return true;
+  }
+
+  /** Shows a sample event notification now. */
+  testEventNotification() { return this.show({ title: 'Eid al-Fitr is tomorrow', body: 'Example reminder for an Islamic event', tag: 'test-event' }); }
+
   /** Fires everything that is due. Public so tests (and the wake-up handlers) can drive it. */
   check(now = Date.now()) {
     const today = new Date(now).toDateString();
@@ -175,6 +196,10 @@ export class NotifyService {
     for (const e of dueAlerts(this.pending(), now, this.fired)) {
       this.markFired(e.id);
       if (e.kind === 'alarm') this.ring(e); else void this.showPrayer(e);
+    }
+    for (const e of dueEventAlerts(this.eventPlan(), now, this.fired)) {
+      this.markFired(e.id);
+      void this.show({ title: e.title, body: e.body, tag: e.id });
     }
     const keep = this.snoozes().filter(e => e.at > now - GRACE && !this.fired.has(e.id));
     if (keep.length !== this.snoozes().length) { lsSet('i360.snoozes', keep); this.snoozes.set(keep); }

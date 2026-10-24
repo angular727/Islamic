@@ -4,6 +4,8 @@ import { AlarmService } from '../core/alarm.service';
 import { NotifyService } from '../core/notify.service';
 import { ALARM_SOUNDS, AlarmSound, FIVE, FivePrayer, SettingsService } from '../core/settings.service';
 import { PrayerService } from '../core/prayer.service';
+import { EVENTS } from '../core/hijri';
+import { eventId, nextOccurrence } from '../core/islamic-events';
 
 const MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
 
@@ -58,6 +60,29 @@ const MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
       <button class="btn-i outline sm mt-3" (click)="n.testNotification()"><i class="bi bi-bell"></i> Send a test notification</button>
     </div>
 
+    <!-- Islamic events -->
+    <div class="section-title">Islamic events</div>
+    <div class="card-i mb-3">
+      <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" id="em" [checked]="s.s().islamicEvents" (change)="onEvents($any($event.target))" />
+        <label class="form-check-label fw-semibold" for="em">Remind me of important Islamic dates</label>
+      </div>
+      <div class="small text-secondary mb-2">You get a reminder in advance and another on the day, at 8:00 in the morning. Dates follow the Islamic calendar and can differ by a day depending on moon sighting.</div>
+      <label class="small text-secondary">Advance reminder</label>
+      <select class="form-select form-select-sm w-auto mb-2" [ngModel]="s.s().eventAdvance" (ngModelChange)="s.patch({ eventAdvance: +$event })" [disabled]="!s.s().islamicEvents" aria-label="Advance reminder">
+        @for (d of [0, 1, 3, 7]; track d) { <option [ngValue]="d">{{ d ? d + (d === 1 ? ' day before' : ' days before') : 'On the day only' }}</option> }
+      </select>
+      @for (e of events; track e.key) {
+        <div class="prow" [class.off]="!s.s().islamicEvents">
+          <label class="form-check form-switch m-0 flex-grow-1">
+            <input class="form-check-input" type="checkbox" [checked]="eventOn(e.key)" [disabled]="!s.s().islamicEvents" (change)="setEvent(e.key, $any($event.target).checked)" [attr.aria-label]="e.name" />
+            <span class="ms-1">{{ e.name }}<span class="d-block text-secondary small">{{ e.when }}@if (e.differs) { · scholars differ on observing this }</span></span>
+          </label>
+        </div>
+      }
+      <button class="btn-i outline sm mt-3" (click)="n.testEventNotification()"><i class="bi bi-calendar-event"></i> Send a sample reminder</button>
+    </div>
+
     <!-- alarms -->
     <div class="section-title">Prayer alarms</div>
     <div class="card-i mb-3">
@@ -108,6 +133,14 @@ export class AlertSettingsComponent {
   keys = FIVE;
   minutes = MINUTES;
   sounds = ALARM_SOUNDS;
+
+  /** The events with the date of their next occurrence. */
+  /** Soonest first. */
+  events = EVENTS.map(e => ({ e, date: nextOccurrence(e, this.s.s().hijriAdjust) })).sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map(({ e, date }) => ({ key: eventId(e), name: e.name, differs: !!e.differs, when: date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) }));
+  eventOn(key: string) { return !this.s.s().eventsOff.includes(key); }
+  setEvent(key: string, on: boolean) { const off = this.s.s().eventsOff.filter(k => k !== key); this.s.patch({ eventsOff: on ? off : [...off, key] }); }
+  async onEvents(el: HTMLInputElement) { const ok = await this.n.setIslamicEvents(el.checked); el.checked = ok ? el.checked : false; }
 
   name(k: FivePrayer) { return this.n.label(k); }
   time(k: FivePrayer) { return this.prayer.fmt(this.prayer.today()[k]); }
