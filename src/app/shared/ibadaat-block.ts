@@ -13,27 +13,27 @@ import { ListenComponent } from './listen';
   template: `
     @let b = $any(blk());
     @switch (b.t) {
-      @case ('p') { <p class="mb-2">{{ b.text }}</p> }
+      @case ('p') { <p class="mb-2" dir="auto">{{ b.text }}</p> }
 
       @case ('steps') {
-        <ol class="steps">@for (it of b.items; track $index) { <li>{{ it }}</li> }</ol>
+        <ol class="steps">@for (it of b.items; track $index) { <li dir="auto">{{ it }}</li> }</ol>
       }
 
       @case ('list') {
-        <ul class="bul">@for (it of b.items; track $index) { <li>{{ it }}</li> }</ul>
+        <ul class="bul">@for (it of b.items; track $index) { <li dir="auto">{{ it }}</li> }</ul>
       }
 
       @case ('note') {
         <div class="nt" [class]="'nt-' + b.kind">
           <i class="bi" [class]="b.kind === 'warn' ? 'bi-exclamation-triangle' : b.kind === 'scholar' ? 'bi-person-check' : 'bi-lightbulb'"></i>
-          <div>{{ b.text }}</div>
+          <div class="nt-t" dir="auto">{{ b.text }}</div>
         </div>
       }
 
       @case ('rank') {
         <div class="rank">
           @for (it of b.items; track $index) {
-            <div class="rk-row"><span class="rk" [class]="'rk-' + it.kind">{{ labels[it.kind] }}</span><span>{{ it.text }}</span></div>
+            <div class="rk-row"><span class="rk" [class]="'rk-' + it.kind">{{ labels[it.kind] }}</span><span class="rk-t" dir="auto">{{ it.text }}</span></div>
           }
         </div>
       }
@@ -74,12 +74,12 @@ import { ListenComponent } from './listen';
         <div class="diff">
           <div class="fw-semibold mb-2"><i class="bi bi-signpost-split"></i> {{ b.topic }}</div>
           @for (r of rows(b); track r.id) {
-            @if (r.mine || !hasMine()) { <div class="sch" [class.mine]="r.mine"><b>{{ r.label }}</b><span>{{ r.text }}</span></div> }
+            @if (r.mine || !hasMine()) { <div class="sch" [class.mine]="r.mine"><b>{{ r.label }}</b><span dir="auto">{{ r.text }}</span></div> }
           }
           @if (hasMine()) {
             <details class="others">
               <summary>Other schools</summary>
-              @for (r of rows(b); track r.id) { @if (!r.mine) { <div class="sch"><b>{{ r.label }}</b><span>{{ r.text }}</span></div> } }
+              @for (r of rows(b); track r.id) { @if (!r.mine) { <div class="sch"><b>{{ r.label }}</b><span dir="auto">{{ r.text }}</span></div> } }
             </details>
           }
           @if (b.note) { <div class="small text-secondary mt-2">{{ b.note }}</div> }
@@ -97,7 +97,7 @@ import { ListenComponent } from './listen';
 
       @case ('qa') {
         @for (it of b.items; track $index) {
-          <details class="qa"><summary>{{ it.q }}</summary><div class="ans">{{ it.a }}</div></details>
+          <details class="qa"><summary dir="auto">{{ it.q }}</summary><div class="ans" dir="auto">{{ it.a }}</div></details>
         }
       }
 
@@ -106,7 +106,7 @@ import { ListenComponent } from './listen';
           @for (it of b.items; track $index) {
             <label class="chk-row" [class.done]="ib.isChecked(idPrefix() + '#' + $index)">
               <input type="checkbox" class="form-check-input" [checked]="ib.isChecked(idPrefix() + '#' + $index)" (change)="ib.toggleCheck(idPrefix() + '#' + $index)" />
-              <span>{{ it }}</span>
+              <span dir="auto">{{ it }}</span>
             </label>
           }
         </div>
@@ -115,7 +115,7 @@ import { ListenComponent } from './listen';
       @case ('refs') {
         <div class="refs" translate="no">
           @for (it of b.items; track $index) {
-            <div class="ref-row"><span class="chip gold">{{ it.ref }}</span><span>{{ it.text }}</span></div>
+            <div class="ref-row"><span class="chip gold">{{ it.ref }}</span><span dir="auto">{{ it.text }}</span></div>
           }
         </div>
       }
@@ -132,17 +132,16 @@ import { ListenComponent } from './listen';
   styles: [`
     :host { display: block; margin-bottom: 12px; }
     .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
-    .steps li { counter-increment: s; position: relative; padding: 8px 8px 8px 42px; margin-bottom: 6px; background: var(--g-50); border-radius: 12px; }
-    .steps li::before { content: counter(s); position: absolute; inset-inline-start: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--g-700); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
-    [dir='rtl'] .steps li { padding: 8px 42px 8px 8px; }
-    .bul { padding-inline-start: 20px; margin: 0; } .bul li { margin-bottom: 6px; }
+    .steps li { counter-increment: s; position: relative; padding-block: 10px; padding-inline: 46px 12px; min-height: 46px; margin-bottom: 8px; background: var(--g-50); border-radius: 12px; line-height: 1.7; text-align: start; }
+    .steps li::before { content: counter(s); position: absolute; inset-inline-start: 10px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--g-700); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+    .bul { padding-inline-start: 22px; margin: 0; } .bul li { margin-bottom: 8px; line-height: 1.7; text-align: start; }
     .nt { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
-    .nt i { margin-top: 2px; }
+    .nt i { margin-top: 3px; flex: none; } .nt-t { min-width: 0; flex: 1; line-height: 1.7; text-align: start; }
     .nt-tip { background: var(--g-50); border-inline-start: 4px solid var(--g-700); }
     .nt-warn { background: #fdf0e6; border-inline-start: 4px solid #d9822b; color: #7a3f06; }
     .nt-scholar { background: var(--gold-soft); border-inline-start: 4px solid var(--gold); color: #6b5314; }
     [data-bs-theme='dark'] .nt-warn { background: #3a2410; color: #f5c89a; } [data-bs-theme='dark'] .nt-scholar { color: #e8d29a; }
-    .rk-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+    .rk-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; } .rk-t { min-width: 0; flex: 1; line-height: 1.7; text-align: start; }
     .rk { flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; margin-top: 2px; }
     .rk-fard, .rk-rukn { background: #e0f3e8; color: #0b5d3b; } .rk-wajib { background: #e4eaf8; color: #2b4a99; }
     .rk-sunnah, .rk-mustahabb { background: var(--gold-soft); color: #8a6a1c; } .rk-mubah, .rk-info { background: #eceff1; color: #455a64; }

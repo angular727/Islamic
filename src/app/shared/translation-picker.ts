@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../core/toast.service';
-import { TranslationService, Translator } from '../core/translation.service';
+import { TranslationService, Translator, languageNames } from '../core/translation.service';
 
 /**
  * Translator selector. Shows the current translation; tapping it opens an inline list of the eight Urdu translators
@@ -30,6 +30,18 @@ import { TranslationService, Translator } from '../core/translation.service';
         }
         <div class="tp-group">Urdu translations</div>
         @for (t of ts.urdu; track t.id) { <ng-container *ngTemplateOutlet="item; context: { $implicit: t }" /> }
+        @if (ts.scholarKey(); as key) {
+          <div class="tp-group">Language of this scholar</div>
+          <div class="tp-chips" role="group" aria-label="Language of the selected scholar">
+            @for (o of ts.scholarLanguages(key); track o.id) {
+              <button type="button" class="tp-chip" [class.sel]="o.id === ts.selectedId()" (click)="pick(o)" [attr.aria-pressed]="o.id === ts.selectedId()">{{ langName(o.language) }}</button>
+            }
+          </div>
+          <div class="tp-src px-1">
+            @if (ts.scholarLanguages(key).length > 1) { Only the languages in which this scholar's own translation is published are shown. }
+            @else { This scholar's translation is published here in Urdu only, so no other language is offered. Other scholars have English translations. }
+          </div>
+        }
         <div class="tp-group">All other languages</div>
         @if (ts.catalogError()) {
           <div class="tp-reason">The list of languages could not be loaded. <button type="button" class="btn btn-sm btn-outline-danger ms-1" (click)="ts.loadCatalog()">Retry</button></div>
@@ -75,6 +87,9 @@ import { TranslationService, Translator } from '../core/translation.service';
     .tp-list { margin-top: 8px; max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
     .tp-group { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 8px 4px 0; }
     .tp-lang { border-radius: 14px; }
+    .tp-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 2px 0; }
+    .tp-chip { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 99px; padding: 6px 14px; font-size: 14px; }
+    .tp-chip.sel { background: var(--g-700); border-color: var(--g-700); color: #fff; }
     .tp-item { align-items: flex-start; }
     .tp-item.sel { border-color: var(--g-700); background: var(--g-100); box-shadow: 0 0 0 1px var(--g-700) inset; }
     .tp-item.off { opacity: .75; background: var(--g-50); }
@@ -95,6 +110,8 @@ export class TranslationPickerComponent implements OnInit {
   shown = computed(() => this.lang() && this.lang() !== 'ur' ? this.ts.inLanguage(this.lang()) : []);
 
   ngOnInit() { void this.ts.loadCatalog(); this.lang.set(this.ts.selected().language === 'ur' ? '' : this.ts.selected().language); }
+
+  langName(code: string) { const n = languageNames(code); return n.native === n.english ? n.english : `${n.english} · ${n.native}`; }
 
   follow() { this.ts.followApp(); this.toast.show('Translation follows the app language'); this.open.set(false); this.changed.emit('auto'); }
 

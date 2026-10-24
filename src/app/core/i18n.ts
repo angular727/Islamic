@@ -27,7 +27,7 @@ const EN: Dict = {
   noResults: 'No results found', loading: 'Loading…', retry: 'Retry', back: 'Back', share: 'Share', copy: 'Copy',
   locationHelp: 'Enable location to get accurate Prayer Times and Qibla direction',
   madhabInfo: 'This affects the Asr prayer calculation.', timetable: 'Monthly Timetable',
-  saved: 'Saved', recent: 'Recent Searches', clear: 'Clear', dailyAyah: 'Daily Ayah', continueReading: 'Continue Reading',
+  saved: 'Saved', recent: 'Recent Searches', clear: 'Clear', dailyAyah: 'Daily Ayah', dailyHadith: 'Daily Hadith', continueReading: 'Continue Reading',
 };
 
 @Pipe({ name: 't' })

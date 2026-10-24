@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SettingsService } from './settings.service';
 import { idbDel } from './store';
-import { DEFAULT_TRANSLATION, TranslationService, URDU_TRANSLATORS, translatorById } from './translation.service';
+import { DEFAULT_TRANSLATION, SCHOLAR_EDITIONS, TranslationService, URDU_TRANSLATORS, translatorById } from './translation.service';
 
 describe('TranslationService', () => {
   let ts: TranslationService;
@@ -91,5 +91,21 @@ describe('TranslationService', () => {
     ts.followApp();
     expect(ts.selectedId()).toBe('hi.hindi');
     localStorage.removeItem('i360.translatorExtra');
+  });
+
+  it('offers a scholar only in the languages where the scholar own translation is published', () => {
+    expect(ts.scholarLanguages('ur.maududi').map(t => t.language)).toEqual(['ur', 'en']);
+    expect(ts.scholarLanguages('fz.urd-muhammadtaqiusm').map(t => t.id)).toEqual(['fz.urd-muhammadtaqiusm', 'fz.eng-muftitaqiusmani']);
+    expect(ts.scholarLanguages('ur.jalandhry').map(t => t.language)).toEqual(['ur']);          // Urdu only: nothing else is invented
+    expect(ts.scholarLanguages('ur.thanvi-bayan')).toEqual([]);                                // not available at all
+    expect(SCHOLAR_EDITIONS.every(t => t.source && t.scholar)).toBeTrue();                     // every extra edition has a real source
+  });
+
+  it('switches a scholar to another language and remembers the scholar', () => {
+    ts.select('ur.kanzuliman');
+    expect(ts.scholarKey()).toBe('ur.kanzuliman');
+    ts.select('en.ahmedraza');
+    expect(ts.selected().language).toBe('en');
+    expect(ts.scholarKey()).toBe('ur.kanzuliman');                                            // still the same scholar
   });
 });

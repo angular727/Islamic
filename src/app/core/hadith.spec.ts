@@ -4,6 +4,7 @@ import { AyahPlayerService } from './ayah-player.service';
 import { HadithPlayerService } from './hadith-player.service';
 import { HadithService } from './hadith.service';
 import { SettingsService } from './settings.service';
+import { idbDel } from './store';
 import { TtsService, pickVoice } from './tts.service';
 
 const entry = (name: string, language: string, author = 'Unknown', direction = 'ltr') => ({ name, book: name.split('-')[1], author, language, direction, source: '', comments: '' });
@@ -20,7 +21,8 @@ const section = (nums: number[], text: (n: number) => string) => ({ metadata: { 
 describe('HadithService', () => {
   let hs: HadithService; let settings: SettingsService; let routes: Record<string, any>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await idbDel('hadith:editions');                     // the editions list is cached; do not reuse another test's list
     localStorage.removeItem('i360.settings');
     routes = {};
     spyOn(window, 'fetch').and.callFake(async (url: any) => {
@@ -78,6 +80,55 @@ describe('HadithService', () => {
 
   it('fails clearly when the Arabic cannot be loaded', async () => {
     await expectAsync(hs.hadiths('bukhari', 99, null)).toBeRejectedWithError(/Arabic/);
+  });
+});
+
+describe('HadithService.daily', () => {
+  let hs: HadithService; let settings: SettingsService;
+  const sections = [{ id: 21, name: 'Book 1', first: 1, last: 50 }, { id: 22, name: 'Book 2', first: 51, last: 100 }];
+  beforeEach(async () => {
+    await idbDel('hadith:editions');                     // the editions list is cached; do not reuse another test's list
+    localStorage.removeItem('i360.settings');
+    spyOn(window, 'fetch').and.callFake(async (url: any) => {
+      const u = String(url);
+      if (u.endsWith('/editions.json')) return new Response(JSON.stringify({
+        bukhari: { name: 'Bukhari', collection: [entry('ara-bukhari', 'Arabic', 'Unknown', 'rtl'), entry('eng-bukhari', 'English', 'Muhsin Khan')] },
+        muslim: { name: 'Muslim', collection: [entry('ara-muslim', 'Arabic', 'Unknown', 'rtl'), entry('eng-muslim', 'English', 'Abdul Hamid')] },
+      }));
+      const m = /editions\/([^/]+)\/sections\/(\d+)\.json/.exec(u);
+      if (!m) return new Response('{}', { status: 404 });
+      const [lo, hi] = m[2] === '21' ? [1, 50] : [51, 100];
+      const list = Array.from({ length: hi - lo + 1 }, (_, i) => ({ hadithnumber: lo + i, text: `${m[1]} ${lo + i} ` + 'word '.repeat(30), grades: [{ name: 'Al-Albani', grade: 'Sahih' }] }));
+      return new Response(JSON.stringify({ metadata: { name: m[1].endsWith('muslim') ? 'Sahih Muslim' : 'Sahih al-Bukhari' }, hadiths: list }));
+    });
+    TestBed.configureTestingModule({});
+    hs = TestBed.inject(HadithService); settings = TestBed.inject(SettingsService);
+    spyOn(hs, 'book').and.resolveTo({ name: 'Test', sections });
+  });
+
+  it('gives the same hadith all day, from a Sahih collection, with its Arabic, translation and reference', async () => {
+    const day = new Date(2030, 2, 5, 9, 0);
+    const a = await hs.daily(day);
+    const b = await hs.daily(new Date(2030, 2, 5, 21, 30));
+    expect(b.hadith.number).toBe(a.hadith.number);
+    expect(['bukhari', 'muslim']).toContain(a.key);
+    expect(a.hadith.arabic).toContain(`ara-${a.key}`);              // the original Arabic edition, unchanged
+    expect(a.hadith.text).toContain(`eng-${a.key}`);                 // the published English translation
+    expect(a.hadith.reference).toMatch(/\d+$/);                       // collection name and hadith number
+    expect(a.hadith.grades[0].grade).toBe('Sahih');
+  });
+
+  it('changes from one day to the next', async () => {
+    const seen = new Set<string>();
+    for (let d = 1; d <= 8; d++) { const x = await hs.daily(new Date(2030, 2, d, 10)); seen.add(x.key + x.hadith.number); }
+    expect(seen.size).toBeGreaterThan(5);
+  });
+
+  it('still returns the Arabic alone when the reader chose Arabic only', async () => {
+    settings.patch({ hadithLang: 'ara' });
+    const a = await hs.daily(new Date(2030, 2, 5));
+    expect(a.translation).toBeNull();
+    expect(a.hadith.arabic).toBeTruthy();
   });
 });
 

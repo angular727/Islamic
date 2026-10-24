@@ -28,10 +28,18 @@ export interface Settings {
   method: string;
   adjustments: Record<PrayerKey, number>;
   /** Master switches: notifications and alarms can each be on while the other is off. */
+  /** Set once the notification defaults (on, at prayer time) have been applied, so a later choice is never overridden. */
+  alertsInit: boolean;
   notifications: boolean;
   notifyPrayer: Record<FivePrayer, PrayerNotify>;
   alarms: boolean;
   alarmPrayer: Record<FivePrayer, PrayerAlarm>;
+  /** Notifications for important Islamic dates: a reminder some days ahead and one on the day. */
+  islamicEvents: boolean;
+  /** Days before an event for the advance reminder. */
+  eventAdvance: number;
+  /** Ids ("month-day") of events switched off. Events that scholars differ on start switched off. */
+  eventsOff: string[];
   /** Minutes an alarm is postponed by "Snooze". */
   snooze: number;
   location: Loc | null;
@@ -64,11 +72,15 @@ export const DEFAULTS: Settings = {
   onboarded: false, name: 'Guest', lang: 'en', madhab: 'hanafi', theme: 'light', accent: 'green',
   method: 'MuslimWorldLeague',
   adjustments: { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
-  notifications: false,
-  notifyPrayer: Object.fromEntries(FIVE.map(k => [k, { on: true, before: 10 }])) as Record<FivePrayer, PrayerNotify>,
+  alertsInit: true,
+  notifications: true,
+  notifyPrayer: Object.fromEntries(FIVE.map(k => [k, { on: true, before: 0 }])) as Record<FivePrayer, PrayerNotify>,
   alarms: false,
   alarmPrayer: Object.fromEntries(FIVE.map(k => [k, { on: true, before: 0, sound: 'chime' }])) as Record<FivePrayer, PrayerAlarm>,
   snooze: 10,
+  islamicEvents: true,
+  eventAdvance: 3,
+  eventsOff: ['3-12', '7-27', '8-15'],
   location: null, savedLocations: [], hijriAdjust: 0,
   translation: 'ur.jalandhry', showTranslation: true, showTranslit: false, arabicSize: 30, transSize: 16,
   haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: false, translationAuto: true, translationAudio: true, recitationAudio: true, ttsRate: 1, hadithLang: '',
@@ -88,6 +100,13 @@ export function loadSettings(saved: Record<string, any>): Settings {
     out.notifications = FIVE.some(k => azan[k] !== 'off');
     out.alarms = FIVE.some(k => azan[k] === 'azan');
   }
+  // Prayer-time notifications are on by default. Someone who has never turned them on (they were off by default before)
+  // gets them now, at the prayer time; anyone who has already made a choice keeps it.
+  if (!rest['alertsInit'] && !out.notifications) {
+    out.notifications = true;
+    out.notifyPrayer = DEFAULTS.notifyPrayer;
+  }
+  out.alertsInit = true;
   return out;
 }
 

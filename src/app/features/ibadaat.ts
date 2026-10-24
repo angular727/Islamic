@@ -30,7 +30,7 @@ const DISCLAIMER = `This is an educational guide compiled from the Quran, authen
       </div>
 
       <div class="search-box mb-3"><i class="bi bi-search"></i>
-        <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search all lessons (e.g. wudu, tawaf, takbeer)" aria-label="Search lessons" /></div>
+        <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search lessons (wudu, tawaf…)" aria-label="Search lessons" /></div>
 
       @if (q().trim().length >= 2) {
         <div class="small text-secondary mb-2">{{ results().length }} result{{ results().length === 1 ? '' : 's' }}</div>
@@ -56,10 +56,9 @@ const DISCLAIMER = `This is an educational guide compiled from the Quran, authen
           <div class="icard mb-3">
             <div class="d-flex align-items-start gap-3">
               <div class="icon"><i class="bi" [class]="'bi-' + s.icon"></i></div>
-              <div class="flex-grow-1">
-                <div class="arabic-plain ar-title">{{ s.ar }}</div>
-                <div class="fw-semibold">{{ s.en }}</div>
-                <div class="urdu-t">{{ s.ur }}</div>
+              <div class="flex-grow-1 min-w-0">
+                <div class="fs-5 fw-semibold lh-sm">{{ s.en }}</div>
+                <div class="names"><span class="arabic-plain ar-title">{{ s.ar }}</span><span class="urdu-t">{{ s.ur }}</span></div>
               </div>
             </div>
             <p class="text-secondary small mt-2 mb-2">{{ s.desc }}</p>
@@ -76,9 +75,10 @@ const DISCLAIMER = `This is an educational guide compiled from the Quran, authen
   styles: [`
     .icard { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; box-shadow: var(--shadow); }
     .icon { width: 56px; height: 56px; border-radius: 16px; background: var(--g-100); color: var(--g-700); display: grid; place-items: center; font-size: 28px; flex: none; }
-    .ar-title { font-size: 26px; line-height: 1.5; color: var(--g-700); text-align: start; }
-    [dir='ltr'] .ar-title { direction: rtl; text-align: left; }
-    .urdu-t { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: left; font-size: 15px; line-height: 2; }
+    .min-w-0 { min-width: 0; }
+    .names { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+    .ar-title { font-size: 24px; line-height: 1.6; color: var(--g-700); text-align: start; }
+    .urdu-t { font-family: 'Noto Nastaliq Urdu', serif; font-size: 15px; line-height: 2; color: var(--muted); }
     .resume { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: linear-gradient(160deg, var(--g-700), var(--g-900)); color: #fff; text-decoration: none; }
     .resume i:first-child { font-size: 30px; }
     .disc { font-size: 12.5px; color: var(--muted); padding: 10px 4px; }
@@ -117,11 +117,11 @@ export class IbadaatHomePage {
 
         <div class="learn-hero mb-3">
           <div class="d-flex align-items-center gap-3">
-            <div class="flex-grow-1">
-              <div class="arabic-plain fs-3" style="text-align:start">{{ s.ar }}</div>
-              <div class="fw-semibold">{{ s.en }} · <span class="urdu d-inline" style="font-size:15px">{{ s.ur }}</span></div>
+            <div class="hero-ic"><i class="bi" [class]="'bi-' + s.icon"></i></div>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fs-5 fw-semibold lh-sm">{{ s.en }}</div>
+              <div class="hero-sub"><span class="arabic-plain">{{ s.ar }}</span><span class="urdu-h">{{ s.ur }}</span></div>
             </div>
-            <i class="bi fs-1 opacity-75" [class]="'bi-' + s.icon"></i>
           </div>
           <div class="small opacity-75 mt-2">{{ s.desc }}</div>
           <div class="progress mt-3" style="height:6px; background: rgba(255,255,255,.25)"><div class="progress-bar bg-warning" [style.width.%]="pr().pct"></div></div>
@@ -132,7 +132,7 @@ export class IbadaatHomePage {
           <div class="search-box flex-grow-1"><i class="bi bi-search"></i>
             <input class="input-i" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="Search this section" aria-label="Search this section" /></div>
         </div>
-        <div class="d-flex justify-content-end mb-2"><app-school-picker /></div>
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap"><span class="small text-secondary">Rulings shown for</span><app-school-picker /></div>
 
         <div class="pills mb-3">
           <button class="pill" [class.active]="group() === ''" (click)="group.set('')">All</button>
@@ -163,7 +163,12 @@ export class IbadaatHomePage {
     .crumbs { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; }
     .crumbs a { text-decoration: none; font-weight: 600; } .crumbs i { font-size: 10px; }
     .num-badge.ok { background: #1fa463; color: #fff; }
-    .urdu-s { font-family: 'Noto Nastaliq Urdu', serif; direction: rtl; text-align: start; line-height: 1.9; }
+    .urdu-s { font-family: 'Noto Nastaliq Urdu', serif; direction: inherit; text-align: start; line-height: 1.9; }
+    .hero-ic { width: 52px; height: 52px; border-radius: 16px; background: rgba(255, 255, 255, .16); display: grid; place-items: center; font-size: 26px; flex: none; }
+    .hero-sub { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+    .hero-sub .arabic-plain { text-align: start; font-size: 24px; line-height: 1.6; }
+    .hero-sub .urdu-h { font-family: 'Noto Nastaliq Urdu', serif; font-size: 16px; opacity: .85; line-height: 1.9; }
+    .min-w-0 { min-width: 0; }
   `],
 })
 export class IbadaatSectionPage {
@@ -245,11 +250,11 @@ export class RamadanTrackerComponent {
       <div class="pad">
         <nav class="crumbs" aria-label="Breadcrumb">
           <a routerLink="/ibadaat">Ibadaat</a><i class="bi bi-chevron-right"></i>
-          <a [routerLink]="['/ibadaat', f.section.id]">{{ f.section.en }}</a><i class="bi bi-chevron-right"></i><span>{{ f.lesson.title }}</span>
+          <a [routerLink]="['/ibadaat', f.section.id]">{{ f.section.en }}</a>
         </nav>
 
         <h1 class="h4 mb-0">{{ f.lesson.title }}</h1>
-        @if (f.lesson.urdu) { <div class="urdu" style="font-size:18px">{{ f.lesson.urdu }}</div> }
+        @if (f.lesson.urdu) { <div class="urdu" style="font-size:18px; direction:inherit; text-align:start">{{ f.lesson.urdu }}</div> }
         <div class="text-secondary small mb-3">{{ f.lesson.group }} · Lesson {{ f.index + 1 }} of {{ f.section.lessons.length }}</div>
 
         <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
@@ -273,8 +278,8 @@ export class RamadanTrackerComponent {
 
         @if (f.lesson.sections.length) {
           <div class="d-flex justify-content-end gap-3 mb-2">
-            <button class="btn btn-link btn-sm p-0" (click)="setAll(true)">Expand all</button>
-            <button class="btn btn-link btn-sm p-0" (click)="setAll(false)">Collapse all</button>
+            <button class="lnk" (click)="setAll(true)">Expand all</button>
+            <button class="lnk" (click)="setAll(false)">Collapse all</button>
           </div>
         }
 
@@ -293,10 +298,10 @@ export class RamadanTrackerComponent {
 
         @if (f.lesson.special === 'ramadan') { <app-ramadan-tracker /> }
 
-        <div class="d-flex gap-2 mt-4">
-          @if (f.prev; as p) { <a class="btn-i outline sm flex-fill text-center" [routerLink]="['/ibadaat', f.section.id, p.id]"><i class="bi bi-chevron-left"></i> {{ p.title }}</a> }
-          @if (f.next; as n) { <a class="btn-i sm flex-fill text-center" [routerLink]="['/ibadaat', f.section.id, n.id]">{{ n.title }} <i class="bi bi-chevron-right"></i></a> }
-        </div>
+        <nav class="lnav mt-4" aria-label="Previous and next lesson">
+          @if (f.prev; as p) { <a class="prev" [routerLink]="['/ibadaat', f.section.id, p.id]"><i class="bi bi-chevron-left chev"></i><span><small>Previous</small><b>{{ p.title }}</b></span></a> } @else { <span></span> }
+          @if (f.next; as n) { <a class="next" [routerLink]="['/ibadaat', f.section.id, n.id]"><span><small>Next</small><b>{{ n.title }}</b></span><i class="bi bi-chevron-right chev"></i></a> }
+        </nav>
 
         @if (related().length) {
           <div class="section-title">Related lessons</div>
@@ -320,7 +325,15 @@ export class RamadanTrackerComponent {
     .acc-h { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 14px; font-weight: 700; color: var(--text); }
     .acc-h i { transition: transform .2s; color: var(--g-700); } .acc.open .acc-h i { transform: rotate(180deg); } .acc.open .acc-h { color: var(--g-700); }
     .acc-b { padding: 4px 14px 6px; }
-    .disc { font-size: 12.5px; color: var(--muted); }
+    .disc { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+    .lnk { border: 0; background: transparent; padding: 4px 2px; color: var(--g-700); font-weight: 600; font-size: 13px; }
+    .lnav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .lnav a { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; text-decoration: none; min-width: 0; border: 1.5px solid var(--g-700); color: var(--g-700); background: var(--surface); }
+    .lnav a.next { background: var(--g-700); color: #fff; justify-content: space-between; grid-column: 2; }
+    .lnav a.prev { grid-column: 1; }
+    .lnav span { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+    .lnav small { font-size: 11px; opacity: .75; } .lnav b { font-size: 14px; overflow-wrap: anywhere; }
+    .lnav .chev { flex: none; }
     .content-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; color: #6b5314; }
     .content-note span { flex: 1 1 200px; }
     .content-note.warn { background: #fdf0e6; color: #7a3f06; }

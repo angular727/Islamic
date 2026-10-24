@@ -43,16 +43,18 @@ export function monthStart(ref: Date, offset: number, adjust = 0): { start: Date
   return { start, length: Math.round((next.getTime() - start.getTime()) / DAY), hijri: { y, m, d: 1 } };
 }
 
-export interface IslamicEvent { m: number; d: number; name: string; note?: string }
+export interface IslamicEvent { m: number; d: number; name: string; note?: string; /** Observed by many but not agreed by all scholars: off by default in notifications. */ differs?: boolean }
 export const EVENTS: IslamicEvent[] = [
   { m: 1, d: 1, name: 'Islamic New Year', note: '1 Muharram' },
   { m: 1, d: 10, name: 'Day of Ashura', note: 'Recommended fast on 9th & 10th, or 10th & 11th' },
-  { m: 3, d: 12, name: 'Mawlid an-Nabi', note: "12 Rabi' al-Awwal (observed by many Muslims)" },
-  { m: 7, d: 27, name: "Isra' and Mi'raj", note: '27 Rajab (commonly observed date)' },
-  { m: 8, d: 15, name: "Mid-Sha'ban (Shab-e-Barat)", note: 'Commonly observed' },
+  { m: 3, d: 12, name: 'Mawlid an-Nabi', note: "12 Rabi' al-Awwal (observed by many Muslims)", differs: true },
+  { m: 7, d: 27, name: "Isra' and Mi'raj", note: '27 Rajab (commonly observed date)', differs: true },
+  { m: 8, d: 15, name: "Mid-Sha'ban (Shab-e-Barat)", note: 'Commonly observed', differs: true },
   { m: 9, d: 1, name: 'Start of Ramadan', note: 'Month of fasting' },
+  { m: 9, d: 21, name: 'Last ten nights of Ramadan begin', note: 'Seek Laylat al-Qadr in the odd nights' },
   { m: 9, d: 27, name: 'Laylat al-Qadr (27th night)', note: 'Seek it in the last ten nights, especially the odd ones' },
   { m: 10, d: 1, name: 'Eid al-Fitr', note: '1 Shawwal' },
+  { m: 12, d: 1, name: 'First ten days of Dhu al-Hijjah', note: 'The best days of the year for good deeds' },
   { m: 12, d: 9, name: 'Day of Arafah', note: 'Recommended fast for those not performing Hajj' },
   { m: 12, d: 10, name: 'Eid al-Adha', note: '10 Dhu al-Hijjah' },
 ];

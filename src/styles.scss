@@ -143,7 +143,7 @@ textarea.input-i { height: auto; padding: 12px 14px; }
 .error-box { background: #fdecea; color: #8a1f17; border-radius: 12px; padding: 14px; font-size: 14px; }
 [data-bs-theme='dark'] .error-box { background: #3a1814; color: #ffb4a9; }
 .sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); z-index: 60; display: flex; align-items: flex-end; animation: fade .15s; }
-.sheet { background: var(--surface); width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px 24px; max-height: 82%; overflow-y: auto; animation: up .22s;
+.sheet { background: var(--surface); color: var(--text); width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px 24px; max-height: 82%; overflow-y: auto; animation: up .22s;
   .grab { width: 44px; height: 4px; background: var(--line); border-radius: 4px; margin: -6px auto 12px; } }
 @keyframes up { from { transform: translateY(40px); opacity: .4; } }
 @keyframes fade { from { opacity: 0; } }

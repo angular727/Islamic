@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 import { LocationService } from '../core/location.service';
@@ -10,6 +10,8 @@ import { QuranService } from '../core/quran.service';
 import { TranslationService } from '../core/translation.service';
 import { toHijri, HIJRI_MONTHS } from '../core/hijri';
 import { InstallService } from '../core/install.service';
+import { DailyHadith, HadithService } from '../core/hadith.service';
+import { lsGet, lsSet } from '../core/store';
 import { HeaderComponent, SheetComponent } from '../shared/ui';
 
 interface Tile { link: string; icon: string; key: string }
@@ -42,6 +44,18 @@ export const TILES: Tile[] = [
     </div>
 
     <div class="pad pt-0 mt--card">
+      @if ((s.s().notifications || s.s().islamicEvents) && notify.state() === 'default') {
+        <div class="card-i mb-2 d-flex align-items-center gap-2">
+          <i class="bi bi-bell-fill fs-4 text-success"></i>
+          <div class="flex-grow-1 small">Allow notifications to be told when it is time for each prayer.</div>
+          <button class="btn-i sm" (click)="notify.ask()">Allow</button>
+        </div>
+      } @else if ((s.s().notifications || s.s().islamicEvents) && notify.state() === 'denied') {
+        <a routerLink="/settings" fragment="alerts" class="card-i mb-2 d-flex align-items-center gap-2 text-decoration-none">
+          <i class="bi bi-bell-slash-fill fs-4 text-danger"></i>
+          <div class="flex-grow-1 small text-body">Notifications are blocked, so prayer alerts cannot be shown. Tap to see how to allow them.</div>
+        </a>
+      }
       <div class="next card-i">
         <div class="d-flex justify-content-between align-items-center">
           <span class="text-secondary small fw-semibold">{{ 'nextPrayer' | t }}</span>
@@ -85,11 +99,31 @@ export const TILES: Tile[] = [
         } @else if (ayahError()) { <div class="text-secondary small">Daily ayah needs an internet connection the first time.</div> }
         @else { <div class="skeleton" style="height:90px"></div> }
       </div>
+
+      <div class="section-title">{{ 'dailyHadith' | t }}</div>
+      <div class="card-i" translate="no">
+        @if (dailyHadith(); as d) {
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            <span class="chip gold">{{ d.collection }}</span>
+            @for (g of d.hadith.grades.slice(0, 1); track g.name) { <span class="chip">{{ g.grade }}</span> }
+          </div>
+          <div class="arabic-plain fs-5">{{ d.hadith.arabic }}</div>
+          @if (d.translation && d.hadith.text) {
+            <p class="mt-2 mb-1 trl" [class.urdu]="d.translation.language === 'Urdu'" [dir]="hadithDir(d)">{{ d.hadith.text }}</p>
+          }
+          <div class="d-flex align-items-center justify-content-between mt-2 gap-2">
+            <a class="small fw-semibold" [routerLink]="['/hadith', d.key, d.hadith.section]">{{ d.hadith.reference }}</a>
+            <a class="small" routerLink="/hadith">{{ 'viewAll' | t }} <i class="bi bi-chevron-right"></i></a>
+          </div>
+        } @else if (hadithError()) { <div class="text-secondary small">The daily hadith needs an internet connection the first time.</div> }
+        @else { <div class="skeleton" style="height:120px"></div> }
+      </div>
     </div>`,
   styles: [`
     .top { background: linear-gradient(160deg, var(--g-700), var(--g-900)); color: #fff; padding: 18px 16px 70px; }
     .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--gold); color: #fff; display: grid; place-items: center; font-weight: 700; text-decoration: none; }
     .mt--card { margin-top: -52px; }
+    .trl { line-height: 1.7; border-top: 1px dashed var(--line); padding-top: 8px; } .trl[dir='rtl'] { text-align: right; } .trl.urdu { line-height: 2.2; font-size: 17px; }
     .cd { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
   `],
 })
@@ -103,14 +137,38 @@ export class HomePage {
   tiles = TILES;
   ayah = signal<{ ar: string; en: string; surah: number; num: number; name: string } | null>(null);
   ayahError = signal(false);
+  private hadithSvc = inject(HadithService);
+  dailyHadith = signal<DailyHadith | null>(null);
+  hadithError = signal(false);
   next = this.p.nextPrayer;
   hijri = computed(() => toHijri(this.p.now(), this.s.s().hijriAdjust));
   month = computed(() => HIJRI_MONTHS[this.hijri().m - 1]);
   initial = computed(() => (this.s.s().name || 'G').charAt(0).toUpperCase());
-  private notify = inject(NotifyService);
+  notify = inject(NotifyService);
   muted = computed(() => { const s = this.s.s(), k = this.next().key as FivePrayer; return !(s.notifications && s.notifyPrayer[k]?.on); });
 
-  constructor() { this.loadAyah(); }
+  constructor() {
+    this.loadAyah();
+    // Reload when the app language (and so the hadith translation) changes; yesterday's hadith is never shown.
+    effect(() => { this.s.s().lang; this.s.s().hadithLang; untracked(() => void this.loadHadith()); });
+  }
+
+  hadithDir(d: DailyHadith) { return ['Urdu', 'Arabic', 'Persian', 'Pashto', 'Hebrew', 'Sindhi', 'Uyghur'].includes(d.translation?.language ?? '') ? 'rtl' : 'ltr'; }
+
+  private async loadHadith() {
+    const today = new Date().toDateString();
+    const cacheKey = 'i360.dailyHadith';
+    const saved = lsGet<{ day: string; lang: string; hadithLang: string; data: DailyHadith } | null>(cacheKey, null);
+    const s = this.s.s();
+    if (saved && saved.day === today && saved.lang === s.lang && saved.hadithLang === s.hadithLang) { this.dailyHadith.set(saved.data); return; }
+    this.hadithError.set(false);
+    try {
+      const d = await this.hadithSvc.daily();
+      const data = d;
+      this.dailyHadith.set(data);
+      lsSet(cacheKey, { day: today, lang: s.lang, hadithLang: s.hadithLang, data });
+    } catch { if (!this.dailyHadith()) this.hadithError.set(true); }
+  }
 
   /** The bell on the next-prayer card: switches that prayer's notification (asking for permission first if needed). */
   toggleMute() { void this.notify.togglePrayerNotify(this.next().key as FivePrayer); }
