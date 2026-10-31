@@ -69,6 +69,11 @@ export class NotifyService {
       ? 'Your browser can schedule notifications, so they may also appear when Islam is closed.'
       : 'Web apps cannot schedule alerts once they are completely closed. Notifications and alarms work while Islam is open in a tab or running as an installed app (it may be in the background). For a guaranteed alarm when the app is closed, add the alarms to your phone calendar below.');
     notes.push('The looping alarm sound only plays while Islam is open; when it is in the background you get a persistent notification instead.');
+    if (/Android/.test(navigator.userAgent)) {
+      if (!standalone) notes.push('Android: install Islam (Chrome menu, then Install app or Add to Home screen) and open it from the home screen. Installed apps are kept alive and woken up more reliably than a browser tab.');
+      notes.push('Android: so the system does not stop Islam, open Settings, Apps, Chrome (or Islam if you installed it), Battery, and choose Unrestricted. Also turn off battery saver and allow Notifications for the app.');
+      notes.push('Android: web apps cannot start themselves at a prayer time once the system has stopped them. For a guaranteed reminder, use "Add reminders to phone calendar" below: the calendar app rings even when Islam is closed.');
+    }
     return { notes, triggers, standalone };
   });
 
@@ -85,6 +90,7 @@ export class NotifyService {
   async ask(): Promise<PermState> {
     if (this.read() === 'default') { try { await Notification.requestPermission(); } catch { /* old browsers */ } }
     this.refresh();
+    if (this.state() === 'granted') void this.publishSchedule();
     return this.state();
   }
 
@@ -144,13 +150,13 @@ export class NotifyService {
   // ------------------------------------------------------------------ scheduler
   constructor() {
     // A change of settings, location, calculation method or day rebuilds the plan; wake up for the new next alert.
-    effect(() => { this.plan(); this.eventPlan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); } }); });
+    effect(() => { this.plan(); this.eventPlan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); void this.publishSchedule(); } }); });
   }
 
   start() {
     if (this.started) return;
     this.started = true;
-    const wake = () => { this.refresh(); this.check(); this.rearm(); };
+    const wake = () => { this.refresh(); this.check(); this.rearm(); void this.publishSchedule(); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
     addEventListener('focus', wake); addEventListener('online', wake);
     // Browsers only show the permission prompt in response to a tap or click, so ask on the first one (once; never after a refusal).
@@ -162,7 +168,9 @@ export class NotifyService {
     try { navigator.permissions?.query({ name: 'notifications' as PermissionName }).then(p => { p.onchange = () => this.refresh(); }); } catch { /* not supported */ }
     navigator.serviceWorker?.addEventListener('message', e => this.onWorkerMessage(e.data));
     this.handleLaunch();
-    this.check(); this.rearm(); void this.syncTriggers();
+    this.check(); this.rearm(); void this.syncTriggers(); void this.publishSchedule();
+    // Ask the browser not to clear this site's data when the phone is short on space (it holds the alert schedule).
+    try { void navigator.storage?.persist?.(); } catch { /* not supported */ }
   }
 
   /** Waits until the next alert is due (at most 30 s, so a sleeping device catches up quickly), then checks again. */
@@ -216,7 +224,10 @@ export class NotifyService {
     if (now >= at && now - at < GRACE && !this.fired.has(id)) { this.markFired(id); fn(); }
   }
 
-  private markFired(id: string) { this.fired.add(id); lsSet('i360.fired', [...this.fired].slice(-120)); }
+  private markFired(id: string) {
+    this.fired.add(id); lsSet('i360.fired', [...this.fired].slice(-120));
+    try { navigator.serviceWorker?.controller?.postMessage({ type: 'fired', id }); } catch { /* no worker */ }
+  }
 
   // ------------------------------------------------------------------ showing
   private location() { return this.settings.s().location?.name ?? ''; }
@@ -245,7 +256,41 @@ export class NotifyService {
 
   /** The service worker registration, if one is active (not in `ng serve`, where the worker is disabled). */
   private async registration() {
-    try { const r = await navigator.serviceWorker?.getRegistration(); return r?.active ? r : undefined; } catch { return undefined; }
+    try {
+      const sw = navigator.serviceWorker; if (!sw) return undefined;
+      const r = await sw.getRegistration(); if (!r) return undefined;
+      if (r.active) return r;
+      // Just installed (first visit): wait briefly for it to take over rather than falling back to `new Notification()`, which Android rejects.
+      const ready = await Promise.race([sw.ready, new Promise<undefined>(res => setTimeout(res, 4000))]);
+      return ready?.active ? ready : undefined;
+    } catch { return undefined; }
+  }
+
+  /**
+   * Gives the service worker the coming alerts, so it can show them itself when it gets a chance to run while the page is
+   * frozen or closed (Android freezes background tabs after a few minutes), and asks Chrome for periodic background sync.
+   */
+  private async publishSchedule() {
+    try {
+      if (this.read() !== 'granted') return;
+      const reg = await this.registration(); if (!reg?.active) return;
+      const now = Date.now();
+      const items = [
+        ...this.pending().filter(e => e.at > now - GRACE && e.at < now + 48 * 3600000).map(e => {
+          const t = this.text(e, e.kind === 'alarm');
+          return { id: e.id, at: e.at, title: t.title, body: t.body, tag: e.kind === 'alarm' ? `alarm-${e.prayer}` : e.id, alarm: e.kind === 'alarm', late: 45 * 60000,
+            data: { kind: 'prayer', alert: e.kind, prayer: e.prayer, at: e.at, snoozeMin: this.settings.s().snooze } };
+        }),
+        ...this.eventPlan().filter(e => e.at < now + 48 * 3600000).map(e => ({ id: e.id, at: e.at, title: e.title, body: e.body, tag: e.id, alarm: false, late: 14 * 3600000, data: { kind: 'event' } })),
+      ];
+      try {   // same language as the notifications the page shows
+        const flat = await Promise.race([this.i18n.many(items.flatMap(i => [i.title, i.body])), new Promise<string[]>((_, rej) => setTimeout(rej, 4000))]);
+        items.forEach((it, i) => { it.title = flat[i * 2] ?? it.title; it.body = flat[i * 2 + 1] ?? it.body; });
+      } catch { /* English is better than nothing */ }
+      reg.active.postMessage({ type: 'schedule', alerts: items, fired: [...this.fired] });
+      const ps = (reg as any).periodicSync;
+      if (ps) await ps.register('islam-alerts', { minInterval: 60 * 60000 }).catch(() => {});
+    } catch { /* optional */ }
   }
 
   /** Shows a notification. Returns false when it could not be shown (the in-app toast is still displayed). */
@@ -349,7 +394,10 @@ export class NotifyService {
 
   /** Downloads a calendar file with the enabled alarms for the next 30 days: the phone's calendar rings them even when the app is closed. */
   downloadCalendar() {
-    const ics = buildIcs(this.settings.s(), d => this.prayer.times(d), new Date(), 30, label);
+    const ics = buildIcs(this.settings.s(), d => this.prayer.times(d), new Date(), 30, label, {
+      notifications: true,
+      events: this.settings.s().islamicEvents ? eventAlerts(this.settings.s(), new Date(), 60) : [],
+    });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
     a.download = 'prayer-alarms.ics';

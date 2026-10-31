@@ -75,6 +75,13 @@ describe('buildIcs', () => {
     expect(ics).toContain('BEGIN:VALARM');
     expect(ics).not.toContain('SUMMARY:isha');
   });
+  it('can also include prayer notifications and Islamic event reminders', () => {
+    const s = on();
+    const plain = (buildIcs(s, timesFor, DAY, 1, k => k).match(/BEGIN:VEVENT/g) ?? []).length;
+    const ics = buildIcs(s, timesFor, DAY, 1, k => k, { notifications: true, events: [{ id: 'ev', at: DAY.getTime(), title: 'Ramadan, tomorrow', body: 'Reminder' }] });
+    expect((ics.match(/BEGIN:VEVENT/g) ?? []).length).toBeGreaterThan(plain + 1);
+    expect(ics).toContain('SUMMARY:Ramadan\\, tomorrow');
+  });
 });
 
 describe('loadSettings', () => {

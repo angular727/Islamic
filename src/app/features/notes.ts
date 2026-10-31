@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { dl } from '../core/lang-utils';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
@@ -83,5 +84,5 @@ export class NotesPage {
     this.cur.set(null);
     this.router.navigate([path], { queryParams: qs ? Object.fromEntries(new URLSearchParams(qs)) : {} });
   }
-  date(t: number) { return new Date(t).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
+  date(t: number) { return new Date(t).toLocaleDateString(dl(), { day: 'numeric', month: 'short', year: 'numeric' }); }
 }

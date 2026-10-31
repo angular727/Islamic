@@ -82,8 +82,8 @@ import { TranslationService, Translator, languageNames } from '../core/translati
     .tp-en { font-weight: 600; font-size: 14px; }
     .tp-title { font-size: 12.5px; color: var(--muted); }
     .tp-src { font-size: 11px; color: var(--muted); font-style: italic; }
-    .tp-reason { font-size: 12px; color: #8a1f17; background: #fdecea; border-radius: 8px; padding: 6px 8px; margin-top: 4px; line-height: 1.4; }
-    [data-bs-theme='dark'] .tp-reason { background: #3a1814; color: #ffb4a9; }
+    .tp-reason { font-size: 12px; color: var(--err-fg); background: var(--err-bg); border-radius: 8px; padding: 6px 8px; margin-top: 4px; line-height: 1.4; }
+    :host-context([data-bs-theme='dark']) .tp-reason { background: #3a1814; color: #ffb4a9; }
     .tp-list { margin-top: 8px; max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
     .tp-group { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin: 8px 4px 0; }
     .tp-lang { border-radius: 14px; }

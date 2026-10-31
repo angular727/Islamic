@@ -96,9 +96,10 @@ const ACTION: Record<WaqfAction, { label: string; cls: string }> = {
     .example { background: var(--g-50); border-radius: 12px; padding: 12px; margin-top: 12px; }
     .example .arabic { line-height: 2.1; overflow-wrap: anywhere; }
     .a-stop { background: #fde6e6; color: #a32a2a; } .a-go { background: #e0f3e8; color: #0b5d3b; }
-    .a-either { background: var(--gold-soft); color: #8a6a1c; } .a-special { background: #e4eaf8; color: #2b4a99; }
-    [data-bs-theme='dark'] .a-stop { background: #3a1814; color: #ffb4a9; } [data-bs-theme='dark'] .a-go { background: #12301f; color: #8be0b0; }
-    [data-bs-theme='dark'] .a-special { background: #1b2540; color: #a9bdf5; }
+    .a-either { background: var(--gold-soft); color: var(--on-gold); } .a-special { background: #e4eaf8; color: #2b4a99; }
+    :host-context([data-bs-theme='dark']) .a-stop { background: #3a1814; color: #ffb4a9; } :host-context([data-bs-theme='dark']) .a-go { background: #12301f; color: #8be0b0; }
+    :host-context([data-bs-theme='dark']) .sym { color: #6fe0a8; }
+    :host-context([data-bs-theme='dark']) .a-special { background: #1b2540; color: #a9bdf5; }
   `],
 })
 export class WaqfPage {

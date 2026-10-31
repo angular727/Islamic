@@ -21,7 +21,7 @@ const DISCLAIMER = `This is an educational guide compiled from the Quran, authen
   selector: 'app-ibadaat-home',
   imports: [RouterLink, FormsModule, TPipe, HeaderComponent, EmptyComponent, SchoolPickerComponent],
   template: `
-    <app-header [title]="('ibadaat' | t) + ' · عبادات'" [back]="false" />
+    <app-header [title]="'ibadaat' | t" [back]="false" />
     <div class="pad">
       <div class="learn-hero mb-3">
         <div class="arabic-plain text-center fs-2">الْعِبَادَات</div>
@@ -334,9 +334,9 @@ export class RamadanTrackerComponent {
     .lnav span { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
     .lnav small { font-size: 11px; opacity: .75; } .lnav b { font-size: 14px; overflow-wrap: anywhere; }
     .lnav .chev { flex: none; }
-    .content-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; color: #6b5314; }
+    .content-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; color: var(--on-gold); }
     .content-note span { flex: 1 1 200px; }
-    .content-note.warn { background: #fdf0e6; color: #7a3f06; }
+    .content-note.warn { background: var(--warn-bg); color: var(--warn-fg); }
   `],
 })
 export class IbadaatLessonPage {

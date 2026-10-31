@@ -7,6 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b5d3b">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- Bootstrap comes in a left-to-right and a right-to-left build; the one for the saved language is loaded right away so there is no flash of wrong layout. The app switches it when the language changes. -->
+  <script>
+    (function () {
+      var rtl = ['ar', 'fa', 'he', 'iw', 'ur', 'ps', 'sd', 'ug', 'yi', 'dv', 'ckb'], lang = 'en';
+      try { lang = JSON.parse(localStorage.getItem('i360.settings') || '{}').lang || 'en'; } catch (e) {}
+      var isRtl = rtl.indexOf(String(lang).toLowerCase().split(/[-_]/)[0]) > -1;
+      document.write('<link id="bootstrap-css" rel="stylesheet" href="bootstrap/bootstrap' + (isRtl ? '.rtl' : '') + '.min.css">');
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&amp;family=Amiri:wght@400;700&amp;family=Inter:wght@400;500;600;700&amp;family=Noto+Naskh+Arabic:wght@400;600&amp;family=Noto+Nastaliq+Urdu:wght@400;600&amp;display=swap" rel="stylesheet">

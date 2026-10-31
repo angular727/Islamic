@@ -1,6 +1,6 @@
 import { Injectable, effect, signal } from '@angular/core';
 import { Lang } from './i18n';
-import { isRtl } from './lang-utils';
+import { isRtl, setAppLocale } from './lang-utils';
 import { lsGet, lsSet } from './store';
 
 export interface Loc { name: string; lat: number; lng: number; tz?: string; auto?: boolean }
@@ -68,6 +68,15 @@ export interface Settings {
   ttsRate: number;
 }
 
+/** Fonts for writing systems that the default fonts do not cover. */
+const SCRIPT_FONTS: Record<string, string> = {
+  hi: 'Noto Sans Devanagari', mr: 'Noto Sans Devanagari', ne: 'Noto Sans Devanagari', sa: 'Noto Sans Devanagari',
+  bn: 'Noto Sans Bengali', as: 'Noto Sans Bengali', ta: 'Noto Sans Tamil', te: 'Noto Sans Telugu', ml: 'Noto Sans Malayalam',
+  kn: 'Noto Sans Kannada', gu: 'Noto Sans Gujarati', pa: 'Noto Sans Gurmukhi', si: 'Noto Sans Sinhala', th: 'Noto Sans Thai',
+  lo: 'Noto Sans Lao', km: 'Noto Sans Khmer', my: 'Noto Sans Myanmar', am: 'Noto Sans Ethiopic', ka: 'Noto Sans Georgian',
+  hy: 'Noto Sans Armenian', he: 'Noto Sans Hebrew', iw: 'Noto Sans Hebrew', zh: 'Noto Sans SC', ja: 'Noto Sans JP', ko: 'Noto Sans KR',
+};
+
 export const DEFAULTS: Settings = {
   onboarded: false, name: 'Guest', lang: 'en', madhab: 'hanafi', theme: 'light', accent: 'green',
   method: 'MuslimWorldLeague',
@@ -125,6 +134,27 @@ export class SettingsService {
 
   get rtl() { return isRtl(this.s().lang); }
 
+  /** Bootstrap has a mirrored build for right-to-left languages (margins, paddings, form controls, switches). */
+  private applyBootstrapDirection() {
+    const link = document.getElementById('bootstrap-css') as HTMLLinkElement | null;
+    if (!link) return;
+    const want = `bootstrap/bootstrap${this.rtl ? '.rtl' : ''}.min.css`;
+    if (!link.getAttribute('href')?.endsWith(want)) link.setAttribute('href', want);
+  }
+
+  /** Loads a font for scripts the base fonts do not cover (Devanagari, Bengali, Thai, Chinese…), only when that language is used. */
+  private loadScriptFont(lang: string) {
+    const family = SCRIPT_FONTS[lang.toLowerCase().split(/[-_]/)[0]];
+    document.documentElement.style.setProperty('--script-font', `'${family ?? 'Inter'}'`);
+    if (!family) return;
+    const id = 'font-' + family.replace(/\s+/g, '-');
+    if (document.getElementById(id)) return;
+    const l = document.createElement('link');
+    l.id = id; l.rel = 'stylesheet';
+    l.href = `https://fonts.googleapis.com/css2?family=${family.replace(/\s+/g, '+')}:wght@400;600;700&display=swap`;
+    document.head.appendChild(l);
+  }
+
   applyTheme() {
     const v = this.s();
     const dark = v.theme === 'dark' || (v.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -133,5 +163,8 @@ export class SettingsService {
     root.setAttribute('data-accent', v.accent);
     root.setAttribute('lang', v.lang);
     root.setAttribute('dir', this.rtl ? 'rtl' : 'ltr');
+    setAppLocale(v.lang);
+    this.applyBootstrapDirection();
+    this.loadScriptFont(v.lang);
   }
 }

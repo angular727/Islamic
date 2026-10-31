@@ -5,6 +5,18 @@ const RTL_FALLBACK = new Set(['ar', 'fa', 'he', 'iw', 'ur', 'ps', 'sd', 'ug', 'y
 /** Direction hints learned from the country/language API. */
 const rtlHints = new Map<string, boolean>();
 
+/**
+ * Locale used to format dates, times and numbers: the app language, with Western digits (the Hijri dates, ayah numbers and
+ * prayer times elsewhere in the app use them). Falls back to the browser's locale when the language is not supported.
+ */
+let currentLocale: string | undefined;
+export function setAppLocale(lang: string) {
+  const tag = `${lang}-u-nu-latn`;
+  try { currentLocale = Intl.DateTimeFormat.supportedLocalesOf([tag]).length ? tag : undefined; } catch { currentLocale = undefined; }
+}
+/** Pass as the first argument of toLocaleDateString / toLocaleTimeString / toLocaleString. */
+export const dl = (): string | undefined => currentLocale;
+
 export const baseLang = (code: string) => (code || 'en').toLowerCase().split(/[-_]/)[0];
 
 export function registerRtl(code: string, rtl: boolean) { rtlHints.set(code.toLowerCase(), rtl); }

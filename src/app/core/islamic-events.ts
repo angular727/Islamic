@@ -1,4 +1,5 @@
 import { EVENTS, HIJRI_MONTHS, IslamicEvent, toGregorian, toHijri } from './hijri';
+import { dl } from './lang-utils';
 import { Settings } from './settings.service';
 
 /** Hour of the day (local time) at which event reminders are shown. */
@@ -33,7 +34,7 @@ export function eventAlerts(s: Settings, from: Date, days = 45): EventAlert[] {
         out.push({
           id: `event-${key}-pre${s.eventAdvance}`, at: atHour(early), eventId: eventId(e), daysBefore: s.eventAdvance,
           title: `${e.name} ${s.eventAdvance === 1 ? 'is tomorrow' : `is in ${s.eventAdvance} days`}`,
-          body: `${date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })} · ${note}`,
+          body: `${date.toLocaleDateString(dl(), { weekday: 'long', day: 'numeric', month: 'long' })} · ${note}`,
         });
       }
     }

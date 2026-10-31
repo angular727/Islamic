@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { dl } from '../core/lang-utils';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
 import { NotifyService } from '../core/notify.service';
@@ -20,7 +21,7 @@ import { EmptyComponent, HeaderComponent, SheetComponent } from '../shared/ui';
         @for (c of ud.counters(); track c.id) {
           <button class="pill" [class.active]="c.id === current().id" (click)="select(c.id)">{{ c.name }}</button>
         }
-        <button class="pill add" (click)="openAdd()"><i class="bi bi-plus-lg"></i></button>
+        <button class="pill add" (click)="openAdd()" aria-label="Add counter" title="Add counter"><i class="bi bi-plus-lg"></i></button>
       </div>
 
       <div class="text-center">
@@ -130,5 +131,5 @@ export class TasbeehPage {
     this.sheet.set('');
   }
   remove() { const id = this.current().id; this.select(this.ud.counters()[0].id); this.ud.deleteCounter(id); this.sheet.set(''); }
-  date(t: number) { return new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); }
+  date(t: number) { return new Date(t).toLocaleString(dl(), { dateStyle: 'medium', timeStyle: 'short' }); }
 }
