@@ -40,7 +40,7 @@ import { LanguageService } from '../core/language.service';
   styles: [`
     .hl { margin-bottom: 14px; }
     .pill .en { opacity: .7; font-weight: 400; }
-    .note { background: var(--gold-soft); color: #6b5314; border-radius: 10px; padding: 8px 10px; }
+    .note { background: var(--gold-soft); color: var(--on-gold); border-radius: 10px; padding: 8px 10px; }
     .src { font-style: italic; }
   `],
 })

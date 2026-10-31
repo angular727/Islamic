@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { dl } from '../core/lang-utils';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
@@ -70,7 +71,7 @@ import { HeaderComponent, SheetComponent } from '../shared/ui';
             <tbody>
               @for (r of rows(); track r.date) {
                 <tr [class.today]="isToday(r.date)">
-                  <td class="fw-semibold">{{ r.date.getDate() }} <span class="text-secondary small">{{ r.date.toLocaleDateString([], { weekday: 'short' }) }}</span></td>
+                  <td class="fw-semibold">{{ r.date.getDate() }} <span class="text-secondary small">{{ r.date.toLocaleDateString(dl(), { weekday: 'short' }) }}</span></td>
                   @for (k of keys; track k) { <td>{{ shortTime(r.times[k]) }}</td> }
                 </tr>
               }
@@ -120,6 +121,8 @@ import { HeaderComponent, SheetComponent } from '../shared/ui';
   `],
 })
 export class PrayerTimesPage {
+  /** Locale for dates in the template. */
+  dl = dl;
   p = inject(PrayerService);
   s = inject(SettingsService);
   loc = inject(LocationService);
@@ -136,10 +139,10 @@ export class PrayerTimesPage {
   private timer: any;
   monthOffset = signal(0);
 
-  dateLabel = computed(() => this.p.now().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+  dateLabel = computed(() => this.p.now().toLocaleDateString(dl(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
   hijriLabel = computed(() => { const h = toHijri(this.p.now(), this.s.s().hijriAdjust); return `${h.d} ${HIJRI_MONTHS[h.m - 1]} ${h.y}`; });
   private base = computed(() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + this.monthOffset()); return d; });
-  monthLabel = computed(() => this.base().toLocaleDateString([], { month: 'long', year: 'numeric' }));
+  monthLabel = computed(() => this.base().toLocaleDateString(dl(), { month: 'long', year: 'numeric' }));
   rows = computed(() => { this.s.s(); this.loc.loc(); return this.p.month(this.base().getFullYear(), this.base().getMonth()); });
 
   isFive(k: string) { return (FIVE as readonly string[]).includes(k); }

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { dl } from '../core/lang-utils';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
@@ -85,5 +86,5 @@ export class BookmarksPage {
   remove(b: Bookmark) { this.ud.removeBookmark(b.id); this.toast.show('Bookmark removed'); }
   move(f: string) { this.ud.moveBookmark(this.moveTarget()!.id, f); this.sheet.set(''); }
   addFolder() { this.ud.addFolder(this.newFolder); this.newFolder = ''; }
-  date(t: number) { return new Date(t).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); }
+  date(t: number) { return new Date(t).toLocaleDateString(dl(), { day: 'numeric', month: 'short', year: 'numeric' }); }
 }

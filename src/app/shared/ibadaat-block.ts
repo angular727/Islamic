@@ -138,15 +138,15 @@ import { ListenComponent } from './listen';
     .nt { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; }
     .nt i { margin-top: 3px; flex: none; } .nt-t { min-width: 0; flex: 1; line-height: 1.7; text-align: start; }
     .nt-tip { background: var(--g-50); border-inline-start: 4px solid var(--g-700); }
-    .nt-warn { background: #fdf0e6; border-inline-start: 4px solid #d9822b; color: #7a3f06; }
-    .nt-scholar { background: var(--gold-soft); border-inline-start: 4px solid var(--gold); color: #6b5314; }
-    [data-bs-theme='dark'] .nt-warn { background: #3a2410; color: #f5c89a; } [data-bs-theme='dark'] .nt-scholar { color: #e8d29a; }
+    .nt-warn { background: var(--warn-bg); border-inline-start: 4px solid #d9822b; color: var(--warn-fg); }
+    .nt-scholar { background: var(--gold-soft); border-inline-start: 4px solid var(--gold); color: var(--on-gold); }
+    :host-context([data-bs-theme='dark']) .nt-warn { background: #3a2410; color: #f5c89a; } :host-context([data-bs-theme='dark']) .nt-scholar { color: #e8d29a; }
     .rk-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; } .rk-t { min-width: 0; flex: 1; line-height: 1.7; text-align: start; }
     .rk { flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; margin-top: 2px; }
     .rk-fard, .rk-rukn { background: #e0f3e8; color: #0b5d3b; } .rk-wajib { background: #e4eaf8; color: #2b4a99; }
-    .rk-sunnah, .rk-mustahabb { background: var(--gold-soft); color: #8a6a1c; } .rk-mubah, .rk-info { background: #eceff1; color: #455a64; }
+    .rk-sunnah, .rk-mustahabb { background: var(--gold-soft); color: var(--on-gold); } .rk-mubah, .rk-info { background: #eceff1; color: #455a64; }
     .rk-makruh { background: #fdf0e6; color: #a35a10; } .rk-haram { background: #fde6e6; color: #a32a2a; }
-    [data-bs-theme='dark'] .rk { filter: brightness(.85); }
+    :host-context([data-bs-theme='dark']) .rk { filter: brightness(.85); }
     .rec { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); }
     .ar { font-size: 26px; white-space: pre-line; }
     .diff { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--surface); }

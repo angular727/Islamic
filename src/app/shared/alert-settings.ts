@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { dl } from '../core/lang-utils';
 import { FormsModule } from '@angular/forms';
 import { AlarmService } from '../core/alarm.service';
 import { NotifyService } from '../core/notify.service';
@@ -112,16 +113,16 @@ const MINUTES = [0, 5, 10, 15, 20, 30, 45, 60];
       </select>
       <div class="d-flex flex-wrap gap-2">
         <button class="btn-i outline sm" (click)="n.testAlarm()"><i class="bi bi-alarm"></i> Test alarm</button>
-        <button class="btn-i outline sm" (click)="n.downloadCalendar()" [disabled]="!s.s().alarms"><i class="bi bi-calendar-event"></i> Add alarms to phone calendar</button>
+        <button class="btn-i outline sm" (click)="n.downloadCalendar()"><i class="bi bi-calendar-event"></i> Add reminders to phone calendar</button>
       </div>
-      <div class="small text-secondary mt-2">The calendar file contains the next 30 days of your enabled alarms. Your phone's calendar will ring them even when Islam is closed. Open the downloaded file to add it.</div>
+      <div class="small text-secondary mt-2">The calendar file contains the next 30 days of your enabled alarms and prayer notifications, plus Islamic event reminders. Your phone's calendar will ring them even when Islam is closed. Open the downloaded file to add it.</div>
     </div>
   `,
   styles: [`
     .prow, .arow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); }
     .off { opacity: .55; }
-    .help { background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; color: #5c4a12; }
-    [data-bs-theme='dark'] .help { color: #f0dca0; }
+    .help { background: var(--gold-soft); border-radius: 12px; padding: 10px 12px; color: var(--on-gold); }
+    :host-context([data-bs-theme='dark']) .help { color: #f0dca0; }
     .bi-bell-fill, .bi-check-circle-fill { color: var(--g-700); } .bi-bell-slash-fill, .bi-x-octagon-fill { color: #b3261e; } .bi-exclamation-triangle-fill { color: #b7791f; }
   `],
 })
@@ -137,7 +138,7 @@ export class AlertSettingsComponent {
   /** The events with the date of their next occurrence. */
   /** Soonest first. */
   events = EVENTS.map(e => ({ e, date: nextOccurrence(e, this.s.s().hijriAdjust) })).sort((a, b) => a.date.getTime() - b.date.getTime())
-    .map(({ e, date }) => ({ key: eventId(e), name: e.name, differs: !!e.differs, when: date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) }));
+    .map(({ e, date }) => ({ key: eventId(e), name: e.name, differs: !!e.differs, when: date.toLocaleDateString(dl(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) }));
   eventOn(key: string) { return !this.s.s().eventsOff.includes(key); }
   setEvent(key: string, on: boolean) { const off = this.s.s().eventsOff.filter(k => k !== key); this.s.patch({ eventsOff: on ? off : [...off, key] }); }
   async onEvents(el: HTMLInputElement) { const ok = await this.n.setIslamicEvents(el.checked); el.checked = ok ? el.checked : false; }

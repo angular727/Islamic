@@ -12,7 +12,8 @@
           "/manifest.webmanifest",
           "/*.css",
           "/*.js",
-          "/data/*.json"
+          "/data/*.json",
+          "/bootstrap/*.css"
         ]
       }
     },

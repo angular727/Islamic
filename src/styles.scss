@@ -5,6 +5,8 @@
   --bg: #f6f8f5; --surface: #ffffff; --text: #16241d; --muted: #6b7a72; --line: #e3eae6;
   --nav-h: 66px; --radius: 16px;
   --shadow: 0 2px 10px rgba(11, 93, 59, .08);
+  /* text colours on the soft gold and warning backgrounds (readable in both themes) */
+  --on-gold: #6b5314; --warn-bg: #fdf0e6; --warn-fg: #7a3f06; --err-bg: #fdecea; --err-fg: #8a1f17;
   --bs-primary: var(--g-700); --bs-primary-rgb: 11, 93, 59;
 }
 [data-accent='teal'] { --g-900: #07414a; --g-700: #0d6e7a; --g-500: #1993a1; --g-100: #def0f2; --g-50: #eff8f9; --bs-primary: #0d6e7a; --bs-primary-rgb: 13, 110, 122; }
@@ -13,6 +15,7 @@
   --bg: #0c1511; --surface: #14211b; --text: #e8f0ec; --muted: #94a69c; --line: #213329;
   --g-100: #173024; --g-50: #112019; --gold-soft: #2c2512;
   --shadow: 0 2px 12px rgba(0, 0, 0, .35);
+  --on-gold: #f0dca0; --warn-bg: #3a2410; --warn-fg: #f5c89a; --err-bg: #3a1814; --err-fg: #ffb4a9;
 }
 [data-bs-theme='dark'][data-accent='green'] { --g-700: #17895a; --g-500: #26a874; --g-100: #153326; }
 [data-bs-theme='dark'][data-accent='teal'] { --g-700: #1893a2; --g-100: #123238; }
@@ -21,14 +24,15 @@
 * { -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
 body {
-  margin: 0; background: #dfe8e2; color: var(--text); font-family: 'Inter', system-ui, sans-serif;
+  margin: 0; background: #dfe8e2; color: var(--text); font-family: var(--script-font, 'Inter'), 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; overflow-wrap: break-word;
 }
 [data-bs-theme='dark'] body { background: #050a08; }
 [dir='rtl'] body { font-family: 'Noto Naskh Arabic', 'Inter', sans-serif; }
 [lang='ur'] body { font-family: 'Noto Nastaliq Urdu', 'Inter', sans-serif; line-height: 1.9; }
 
 .phone {
-  position: relative; max-width: 480px; margin: 0 auto; height: 100dvh; background: var(--bg);
+  position: relative; max-width: 480px; width: 100%; margin: 0 auto; height: 100dvh; background: var(--bg);
   overflow: hidden; display: flex; flex-direction: column;
   @media (min-width: 520px) { box-shadow: 0 0 40px rgba(0, 0, 0, .18); }
 }
@@ -92,7 +96,7 @@ body {
     &.active { background: var(--g-700); color: #fff; } }
 }
 .chip { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 11.5px; background: var(--g-100); color: var(--g-700); font-weight: 600; }
-.chip.gold { background: var(--gold-soft); color: #8a6a1c; }
+.chip.gold { background: var(--gold-soft); color: var(--on-gold); }
 
 /* Inputs */
 .input-i {
@@ -140,7 +144,7 @@ textarea.input-i { height: auto; padding: 12px 14px; }
 @keyframes sh { to { background-position: -200% 0; } }
 .empty { text-align: center; color: var(--muted); padding: 40px 20px;
   i { font-size: 44px; color: var(--g-500); opacity: .6; display: block; margin-bottom: 8px; } }
-.error-box { background: #fdecea; color: #8a1f17; border-radius: 12px; padding: 14px; font-size: 14px; }
+.error-box { background: var(--err-bg); color: var(--err-fg); border-radius: 12px; padding: 14px; font-size: 14px; }
 [data-bs-theme='dark'] .error-box { background: #3a1814; color: #ffb4a9; }
 .sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); z-index: 60; display: flex; align-items: flex-end; animation: fade .15s; }
 .sheet { background: var(--surface); color: var(--text); width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px 24px; max-height: 82%; overflow-y: auto; animation: up .22s;
@@ -168,3 +172,56 @@ a { color: var(--g-700); }
 .pill.active { background: var(--g-700); color: #fff; border-color: var(--g-700); }
 .pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .pills::-webkit-scrollbar { display: none; }
+
+/* ============================================================ Responsive layout
+   Phone first. On tablets and desktops the app column grows instead of staying a narrow strip. */
+@media (min-width: 768px) {
+  .phone { max-width: 760px; border-radius: 0; }
+  .pad { padding: 24px 28px; }
+  .quick-grid { grid-template-columns: repeat(8, 1fr); gap: 16px 10px; }
+  .sheet { max-width: 640px; margin-inline: auto; border-radius: 22px 22px 0 0; }
+  .page-header h1 { font-size: 18px; }
+}
+@media (min-width: 1200px) {
+  .phone { max-width: 980px; }
+  .pad { padding: 28px 40px; }
+  .sheet { max-width: 720px; }
+}
+@media (min-width: 768px) and (min-height: 700px) { body { background: linear-gradient(160deg, #dfe8e2, #cfded5); } }
+[data-bs-theme='dark'] body { background: #050a08 !important; }
+
+/* ============================================================ Language-specific typography */
+/* Scripts that need more line height than Latin text so marks and tall letters do not collide. */
+:lang(hi), :lang(mr), :lang(ne), :lang(bn), :lang(as), :lang(ta), :lang(te), :lang(ml), :lang(kn), :lang(gu), :lang(pa), :lang(si), :lang(my), :lang(km) { line-height: 1.75; }
+:lang(th), :lang(lo) { line-height: 1.85; word-break: keep-all; }
+:lang(zh), :lang(ja), :lang(ko) { line-height: 1.7; word-break: normal; line-break: strict; }
+[dir='rtl'] body:not(:lang(ur)) { line-height: 1.8; }
+/* Long words and URLs never push a card wider than the screen. */
+.card-i, .row-i .grow, .acc-b, .sheet { overflow-wrap: anywhere; }
+/* Numbers, times and countdowns keep their digits in a fixed left-to-right order, also inside right-to-left text. */
+.cd, .num-badge, .chip, .ayah-end, time, .tabular { unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+.cd { direction: ltr; }
+
+/* ============================================================ Modern polish */
+:focus-visible { outline: 2px solid var(--g-500); outline-offset: 2px; border-radius: 8px; }
+button, a, .icon-btn, .row-i, .pill { touch-action: manipulation; }
+.btn-i { transition: transform .15s, opacity .15s, box-shadow .2s, background-color .2s; }
+.btn-i:not(:disabled):hover { box-shadow: 0 4px 14px rgba(11, 93, 59, .25); }
+.card-i, .list-i { transition: box-shadow .2s, transform .2s; }
+a.card-i:hover, button.card-i:hover { box-shadow: 0 6px 20px rgba(11, 93, 59, .14); }
+.row-i:active { background: var(--g-100); }
+.page-header { backdrop-filter: saturate(1.2); box-shadow: 0 2px 12px rgba(0, 0, 0, .12); }
+.bottom-nav a { position: relative; transition: color .2s; }
+.bottom-nav a.active::before { content: ''; position: absolute; top: 0; width: 28px; height: 3px; border-radius: 0 0 4px 4px; background: var(--g-700); }
+.bottom-nav a i { transition: transform .2s; } .bottom-nav a.active i { transform: translateY(-1px) scale(1.08); }
+.quick-grid a { transition: transform .15s; } .quick-grid a:active { transform: scale(.95); }
+.quick-grid a .ic { transition: background-color .2s, color .2s; } .quick-grid a:hover .ic { background: var(--g-700); color: #fff; }
+.section-title { text-transform: none; letter-spacing: .2px; font-size: 13.5px; }
+.screen { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::selection { background: color-mix(in srgb, var(--g-500) 30%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+/* Safe areas on notched phones. */
+.bottom-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+.page-header { padding-top: calc(10px + env(safe-area-inset-top)); }

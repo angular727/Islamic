@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { dl } from './lang-utils';
 import { CalculationMethod, Coordinates, HighLatitudeRule, Madhab, PrayerTimes, Qibla } from 'adhan';
 import { LocationService } from './location.service';
 import { PRAYERS, PrayerKey, SettingsService } from './settings.service';
@@ -103,10 +104,10 @@ export class PrayerService {
   }
 
   fmt(d: Date): string {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: this.loc.loc().tz });
+    return d.toLocaleTimeString(dl(), { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: this.loc.loc().tz });
   }
 
   fmt24(d: Date): string {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: this.loc.loc().tz });
+    return d.toLocaleTimeString(dl(), { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: this.loc.loc().tz });
   }
 }

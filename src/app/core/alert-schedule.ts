@@ -46,13 +46,30 @@ export function dueAlerts(events: AlertEvent[], now: number, fired: ReadonlySet<
   return events.filter(e => now >= e.at && now - e.at <= GRACE_MS && !fired.has(e.id));
 }
 
-/** Calendar file (.ics) with one event per day for each enabled alarm, each carrying a built-in alarm of the phone's calendar. */
-export function buildIcs(s: Settings, timesFor: (d: Date) => DayTimes, from: Date, days: number, label: (k: FivePrayer) => string): string {
+export interface IcsOptions {
+  /** Also add the enabled prayer notifications (at their own time), not only the alarms. */
+  notifications?: boolean;
+  /** Islamic event reminders to add as all-day-style entries. */
+  events?: { id: string; at: number; title: string; body: string }[];
+}
+
+/**
+ * Calendar file (.ics) with one entry per day for each enabled alarm (and notification, and event reminder), each carrying
+ * a built-in alarm of the phone's calendar. The calendar app rings them even when this app is closed.
+ */
+export function buildIcs(s: Settings, timesFor: (d: Date) => DayTimes, from: Date, days: number, label: (k: FivePrayer) => string, opts: IcsOptions = {}): string {
   const stamp = (t: number) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/[,;]/g, m => '\\' + m).replace(/\r?\n/g, '\\n');
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Islam//Prayer alarms//EN', 'CALSCALE:GREGORIAN'];
-  for (const e of buildSchedule({ ...s, alarms: true }, timesFor, from, days).filter(x => x.kind === 'alarm')) {
+  const wanted = buildSchedule({ ...s, alarms: true }, timesFor, from, days).filter(x => x.kind === 'alarm');
+  const notifies = opts.notifications ? buildSchedule(s, timesFor, from, days).filter(x => x.kind === 'notify') : [];
+  for (const e of [...wanted, ...notifies]) {
     lines.push('BEGIN:VEVENT', `UID:${e.id}@islam`, `DTSTAMP:${stamp(Date.now())}`, `DTSTART:${stamp(e.prayerAt)}`, `DTEND:${stamp(e.prayerAt + 10 * 60000)}`,
       `SUMMARY:${label(e.prayer)} prayer`, 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${label(e.prayer)} prayer`, `TRIGGER:-PT${e.before}M`, 'END:VALARM', 'END:VEVENT');
+  }
+  for (const e of opts.events ?? []) {
+    lines.push('BEGIN:VEVENT', `UID:${e.id}@islam`, `DTSTAMP:${stamp(Date.now())}`, `DTSTART:${stamp(e.at)}`, `DTEND:${stamp(e.at + 30 * 60000)}`,
+      `SUMMARY:${esc(e.title)}`, `DESCRIPTION:${esc(e.body)}`, 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(e.title)}`, 'TRIGGER:PT0S', 'END:VALARM', 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
