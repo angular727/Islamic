@@ -1,0 +1,9 @@
+{
+  "appId": "com.islam360.app",
+  "appName": "Islam",
+  "webDir": "dist/islam360/browser",
+  "android": { "allowMixedContent": false },
+  "plugins": {
+    "LocalNotifications": { "smallIcon": "ic_stat_icon", "iconColor": "#0B5D3B" }
+  }
+}

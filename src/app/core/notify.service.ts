@@ -1,6 +1,8 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { AlarmService } from './alarm.service';
-import { AlertEvent, buildIcs, buildSchedule, dueAlerts } from './alert-schedule';
+import { AlertEvent, GRACE_MS, buildIcs, buildSchedule, dueAlerts } from './alert-schedule';
 import { EventAlert, dueEventAlerts, eventAlerts } from './islamic-events';
 import { PrayerService } from './prayer.service';
 import { FIVE, FivePrayer, SettingsService } from './settings.service';
@@ -37,6 +39,9 @@ export class NotifyService {
   private ctx?: AudioContext;
   private timer?: any;
   private started = false;
+  /** True inside the installed Android app (Capacitor), where alerts are scheduled with the phone's own alarm system. */
+  readonly native = Capacitor.isNativePlatform();
+  private nativePerm: PermState = 'default';
 
   /** Notification permission as the app should show it. Updated when the person answers or changes it in browser settings. */
   readonly state = signal<PermState>(this.read());
@@ -61,6 +66,11 @@ export class NotifyService {
     const triggers = typeof Notification !== 'undefined' && 'showTrigger' in Notification.prototype;
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
     const notes: string[] = [];
+    if (this.native) {
+      notes.push('Prayer notifications are scheduled on this phone with Android alarms, so they appear even when Islam is closed and when there is no internet connection.');
+      notes.push('So Android does not delay them: allow "Alarms & reminders" for Islam when asked, and set Battery to Unrestricted for Islam in Settings, Apps.');
+      return { notes, triggers: true, standalone: true };
+    }
     if (s === 'unsupported') notes.push(ios && !standalone
       ? 'On iPhone and iPad, notifications only work after you add Islam to your Home Screen (Share, then Add to Home Screen) and open it from there.'
       : 'This browser does not support notifications. Alarms still ring on screen while Islam is open.');
@@ -79,15 +89,33 @@ export class NotifyService {
 
   // ------------------------------------------------------------------ permission
   private read(): PermState {
+    if (this.native) return this.nativePerm;
     if (typeof Notification === 'undefined') return 'unsupported';
     if (!isSecureContext) return 'insecure';
     return Notification.permission;
   }
 
-  refresh() { this.state.set(this.read()); }
+  refresh() {
+    if (this.native) { void this.refreshNative(); return; }
+    this.state.set(this.read());
+  }
+
+  private async refreshNative() {
+    try {
+      const p = (await LocalNotifications.checkPermissions()).display;
+      this.nativePerm = p === 'granted' ? 'granted' : p === 'denied' ? 'denied' : 'default';
+    } catch { this.nativePerm = 'unsupported'; }
+    this.state.set(this.nativePerm);
+  }
 
   /** Asks for permission only if the browser has not been asked yet; a refusal is never asked again. */
   async ask(): Promise<PermState> {
+    if (this.native) {
+      await this.refreshNative();
+      if (this.nativePerm === 'default') { try { await LocalNotifications.requestPermissions(); } catch { /* ignore */ } await this.refreshNative(); }
+      if (this.nativePerm === 'granted') { void this.ensureExact(); void this.scheduleNative(); }
+      return this.nativePerm;
+    }
     if (this.read() === 'default') { try { await Notification.requestPermission(); } catch { /* old browsers */ } }
     this.refresh();
     if (this.state() === 'granted') void this.publishSchedule();
@@ -150,13 +178,13 @@ export class NotifyService {
   // ------------------------------------------------------------------ scheduler
   constructor() {
     // A change of settings, location, calculation method or day rebuilds the plan; wake up for the new next alert.
-    effect(() => { this.plan(); this.eventPlan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); void this.publishSchedule(); } }); });
+    effect(() => { this.plan(); this.eventPlan(); this.snoozes(); untracked(() => { if (this.started) { this.rearm(); void this.syncTriggers(); void this.publishSchedule(); void this.scheduleNative(); } }); });
   }
 
   start() {
     if (this.started) return;
     this.started = true;
-    const wake = () => { this.refresh(); this.check(); this.rearm(); void this.publishSchedule(); };
+    const wake = () => { this.refresh(); this.check(); this.rearm(); void this.publishSchedule(); void this.scheduleNative(); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
     addEventListener('focus', wake); addEventListener('online', wake);
     // Browsers only show the permission prompt in response to a tap or click, so ask on the first one (once; never after a refusal).
@@ -169,6 +197,7 @@ export class NotifyService {
     navigator.serviceWorker?.addEventListener('message', e => this.onWorkerMessage(e.data));
     this.handleLaunch();
     this.check(); this.rearm(); void this.syncTriggers(); void this.publishSchedule();
+    if (this.native) void this.refreshNative().then(() => this.scheduleNative());
     // Ask the browser not to clear this site's data when the phone is short on space (it holds the alert schedule).
     try { void navigator.storage?.persist?.(); } catch { /* not supported */ }
   }
@@ -203,20 +232,34 @@ export class NotifyService {
 
     for (const e of dueAlerts(this.pending(), now, this.fired)) {
       this.markFired(e.id);
-      if (e.kind === 'alarm') this.ring(e); else void this.showPrayer(e);
+      if (e.kind === 'alarm') this.ring(e); else if (!this.native) void this.showPrayer(e);
     }
+    if (!this.native) this.catchUp(now);
     for (const e of dueEventAlerts(this.eventPlan(), now, this.fired)) {
       this.markFired(e.id);
-      void this.show({ title: e.title, body: e.body, tag: e.id });
+      if (!this.native) void this.show({ title: e.title, body: e.body, tag: e.id });
     }
     const keep = this.snoozes().filter(e => e.at > now - GRACE && !this.fired.has(e.id));
     if (keep.length !== this.snoozes().length) { lsSet('i360.snoozes', keep); this.snoozes.set(keep); }
 
-    for (const r of this.data.reminders()) {
+    for (const r of this.native ? [] : this.data.reminders()) {
       this.once(`rem-${r.id}`, now, new Date(`${r.date}T${r.time || '08:00'}`).getTime(), () => void this.show({ title: r.title, body: 'Reminder', tag: `rem-${r.id}` }));
     }
-    for (const n of this.data.notes()) {
+    for (const n of this.native ? [] : this.data.notes()) {
       if (n.reminder) this.once(`note-${n.id}-${n.reminder}`, now, new Date(n.reminder).getTime(), () => void this.show({ title: n.title, body: 'Note reminder', tag: `note-${n.id}` }));
+    }
+  }
+
+  /**
+   * Prayer notifications that came due while the page was asleep (Android freezes background pages): shown late, with the
+   * real prayer time, instead of being dropped. Alarms are not replayed, because a late alarm is misleading.
+   */
+  private catchUp(now: number) {
+    for (const e of this.pending()) {
+      if (e.kind !== 'notify' || this.fired.has(e.id) || now - e.at <= GRACE_MS || now - e.at > 60 * 60000) continue;
+      this.markFired(e.id);
+      const name = label(e.prayer);
+      void this.show({ title: `${name} time was at ${this.prayer.fmt(new Date(e.prayerAt))}`, body: `${name} · ${this.location() || 'Prayer time'}`, tag: e.id, at: e.at, data: { kind: 'prayer', alert: 'notify', prayer: e.prayer, at: e.at } });
     }
   }
 
@@ -272,6 +315,7 @@ export class NotifyService {
    */
   private async publishSchedule() {
     try {
+      if (this.native) return;
       if (this.read() !== 'granted') return;
       const reg = await this.registration(); if (!reg?.active) return;
       const now = Date.now();
@@ -297,6 +341,7 @@ export class NotifyService {
   async show(o: ShowOptions): Promise<boolean> {
     this.toast.show(o.title, 5000);
     if (this.read() !== 'granted') return false;
+    if (this.native) return this.showNative(o);
     let title = o.title, body = o.body;
     try {
       [title, body] = await Promise.race([this.i18n.many([o.title, o.body]), new Promise<string[]>((_, rej) => setTimeout(rej, 1500))]);
@@ -315,9 +360,78 @@ export class NotifyService {
     try { delete options['actions']; new Notification(title, options); return true; } catch { return false; }   // desktop browsers only
   }
 
+  // ------------------------------------------------------------------ installed Android app
+  /** A stable positive 31-bit number for an alert id (the phone's alarm system identifies alerts by number). */
+  private numId(id: string) { let h = 2166136261; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 1) || 1; }
+
+  private channelsReady = false;
+  private async ensureChannels() {
+    if (this.channelsReady) return;
+    await LocalNotifications.createChannel({ id: 'prayer', name: 'Prayer times', description: 'Notifications at prayer times', importance: 5, visibility: 1, vibration: true, lights: true });
+    await LocalNotifications.createChannel({ id: 'prayer-alarm', name: 'Prayer alarms', description: 'Alarms for prayer times', importance: 5, visibility: 1, vibration: true });
+    await LocalNotifications.createChannel({ id: 'events', name: 'Islamic events', description: 'Reminders for Ramadan, Eid and other dates', importance: 4, visibility: 1, vibration: true });
+    await LocalNotifications.createChannel({ id: 'reminders', name: 'Reminders', description: 'Your own reminders and notes', importance: 4, visibility: 1, vibration: true });
+    this.channelsReady = true;
+  }
+
+  /** Android 12+ lets the person decide whether an app may set exact alarms; ask once so prayer times are not delayed. */
+  private async ensureExact() {
+    try {
+      if (lsGet<boolean>('i360.exactAsked', false)) return;
+      if ((await LocalNotifications.checkExactNotificationSetting()).exact_alarm === 'granted') return;
+      lsSet('i360.exactAsked', true);
+      this.toast.show('Allow "Alarms & reminders" for Islam on the next screen so prayer notifications arrive on time.', 6000);
+      await LocalNotifications.changeExactNotificationSetting();
+    } catch { /* older Android: exact alarms need no permission */ }
+  }
+
+  private async showNative(o: ShowOptions): Promise<boolean> {
+    try {
+      await this.ensureChannels();
+      await LocalNotifications.schedule({ notifications: [{ id: this.numId(o.tag + Date.now()), title: o.title, body: o.body, channelId: 'prayer', schedule: { at: new Date(Date.now() + 400), allowWhileIdle: true }, extra: o.data }] });
+      return true;
+    } catch { return false; }
+  }
+
+  /**
+   * Hands the phone's alarm system the next week of prayer notifications and alarms, the Islamic event reminders and the
+   * person's own reminders. Android shows them itself at the exact time, so they work with the app closed, the phone
+   * asleep or restarted, and no internet. Rebuilt whenever settings, location or the day change.
+   */
+  private async scheduleNative() {
+    if (!this.native || this.read() !== 'granted') return;
+    try {
+      await this.ensureChannels();
+      const now = Date.now(), s = this.settings.s();
+      const prayers = buildSchedule(s, d => this.prayer.times(d), new Date(), 8).filter(e => e.at > now);
+      const events = eventAlerts(s, new Date(), 21).filter(e => e.at > now);
+      const own = [
+        ...this.data.reminders().map(r => ({ id: `rem-${r.id}`, at: new Date(`${r.date}T${r.time || '08:00'}`).getTime(), title: r.title, body: 'Reminder' })),
+        ...this.data.notes().filter(n => n.reminder).map(n => ({ id: `note-${n.id}-${n.reminder}`, at: new Date(n.reminder!).getTime(), title: n.title, body: 'Note reminder' })),
+      ].filter(e => e.at > now);
+      const items = [
+        ...prayers.map(e => { const t = this.text(e, e.kind === 'alarm'); return { id: e.id, at: e.at, title: t.title, body: t.body, channel: e.kind === 'alarm' ? 'prayer-alarm' : 'prayer', extra: { kind: 'prayer', alert: e.kind, prayer: e.prayer, at: e.at } }; }),
+        ...events.map(e => ({ id: e.id, at: e.at, title: e.title, body: e.body, channel: 'events', extra: { kind: 'event' } })),
+        ...own.map(e => ({ ...e, channel: 'reminders', extra: { kind: 'reminder' } })),
+      ].sort((a, b) => a.at - b.at).slice(0, 400);
+      try {   // the language of the app
+        const flat = await Promise.race([this.i18n.many(items.flatMap(i => [i.title, i.body])), new Promise<string[]>((_, rej) => setTimeout(rej, 5000))]);
+        items.forEach((it, i) => { it.title = flat[i * 2] ?? it.title; it.body = flat[i * 2 + 1] ?? it.body; });
+      } catch { /* English is better than nothing */ }
+      const pending = await LocalNotifications.getPending();
+      if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications });
+      if (!items.length) return;
+      await LocalNotifications.schedule({ notifications: items.map(i => ({
+        id: this.numId(i.id), title: i.title, body: i.body, channelId: i.channel, extra: i.extra,
+        schedule: { at: new Date(i.at), allowWhileIdle: true },
+      })) });
+    } catch { /* the in-app timer still works while the app is open */ }
+  }
+
   /** Where the browser supports scheduled notifications, hand it the coming alerts so they show even if the app is closed. */
   private async syncTriggers() {
     try {
+      if (this.native) return;
       if (typeof Notification === 'undefined' || !('showTrigger' in Notification.prototype) || this.read() !== 'granted') return;
       const reg = await this.registration(); if (!reg) return;
       const TT = (window as any).TimestampTrigger; if (!TT) return;

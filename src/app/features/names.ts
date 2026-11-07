@@ -45,13 +45,13 @@ export function watchTips(arabic: string): string[] {
       @else if (error()) { <div class="error-box">{{ error() }} <button class="btn btn-sm btn-outline-danger ms-2" (click)="load()">{{ 'retry' | t }}</button></div> }
       @else {
         <div class="small text-secondary mb-2">{{ list().length }} names</div>
-        <div class="grid" translate="no">
+        <div class="grid">
           @for (n of list(); track n.n) {
             <button class="ncard" (click)="open(n)">
               <span class="num">{{ n.n }}</span>
               @if (learn.status('names', 'n' + n.n) === 'known') { <i class="bi bi-check-circle-fill ok"></i> }
               <div class="arabic-plain ar">{{ n.ar }}</div>
-              <div class="fw-semibold small">{{ n.tr }}</div>
+              <div class="fw-semibold small translit">{{ n.tr }}</div>
               <div class="text-secondary small">{{ n.en }}</div>
               <div class="urdu small">{{ n.ur }}</div>
             </button>
@@ -61,7 +61,7 @@ export function watchTips(arabic: string): string[] {
     </div>
 
     @if (sel(); as n) {
-      <app-sheet translate="no" (closed)="sel.set(null)">
+      <app-sheet (closed)="sel.set(null)">
         <div class="text-center">
           <div class="chip gold mb-2">{{ n.n }} · {{ themeLabel(n.theme) }}</div>
           <div class="arabic-plain" style="font-size:56px; line-height:1.6; text-align:center">{{ n.ar }}</div>
