@@ -39,13 +39,13 @@ import { ListenComponent } from './listen';
       }
 
       @case ('rec') {
-        <div class="rec" translate="no">
+        <div class="rec">
           <div class="fw-semibold">{{ b.title }}</div>
           <div class="small text-secondary mb-2">{{ b.when }}</div>
           <div class="arabic-plain ar">{{ b.ar }}</div>
           <div class="translit mt-2">{{ b.tr }}</div>
           <div class="urdu">{{ b.ur }}</div>
-          <div class="mt-1">{{ b.en }}</div>
+          <div class="mt-1" [attr.translate]="b.quran ? 'no' : null">{{ b.en }}</div>
           <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
             @if (b.ref) { <span class="chip gold">{{ b.ref }}</span> }
             <app-listen [text]="b.ar" [ref]="b.quran ?? ''" [id]="'rec-' + b.title" />
@@ -55,13 +55,13 @@ import { ListenComponent } from './listen';
 
       @case ('dua') {
         @if (dua(b.id); as d) {
-          <div class="rec" translate="no">
+          <div class="rec">
             <div class="fw-semibold">{{ d.title }}</div>
             @if (b.when) { <div class="small text-secondary mb-2">{{ b.when }}</div> }
             <div class="arabic-plain ar">{{ d.arabic }}</div>
             <div class="translit mt-2">{{ d.translit }}</div>
             @if (d.urdu) { <div class="urdu">{{ d.urdu }}</div> }
-            <div class="mt-1">{{ d.translation }}</div>
+            <div class="mt-1" [attr.translate]="d.reference.startsWith('Quran') ? 'no' : null">{{ d.translation }}</div>
             <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
               <span class="chip gold">{{ d.reference }}</span>
               <app-listen [text]="d.arabic" [ref]="d.reference" [id]="'ibdua-' + d.id" />

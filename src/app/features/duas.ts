@@ -43,7 +43,7 @@ export class DuasPage {
     <app-header [title]="title()" />
     <div class="pad">
       @for (d of list(); track d.id) {
-        <div class="card-i mb-3" translate="no">
+        <div class="card-i mb-3">
           <div class="d-flex align-items-center mb-2">
             <div class="fw-semibold flex-grow-1">{{ d.title }}</div>
             <button class="icon-btn" [class.on]="fav(d)" (click)="ud.toggleFavDua(d.id)" aria-label="Favorite"><i class="bi" [class]="fav(d) ? 'bi-heart-fill' : 'bi-heart'"></i></button>
@@ -53,7 +53,7 @@ export class DuasPage {
           </div>
           <div class="arabic-plain" [style.font-size.px]="s.s().arabicSize - 4">{{ d.arabic }}</div>
           <div class="translit mt-2">{{ d.translit }}</div>
-          <div class="mt-2">{{ d.translation }}</div>
+          <div class="mt-2" [attr.translate]="d.reference.startsWith('Quran') ? 'no' : null">{{ d.translation }}</div>
           @if (d.urdu) { <div class="urdu mt-2">{{ d.urdu }}</div> }
           <app-listen class="d-block mt-2" [text]="d.arabic" [ref]="d.reference" [id]="d.id" />
           <div class="d-flex align-items-center mt-3 gap-2">

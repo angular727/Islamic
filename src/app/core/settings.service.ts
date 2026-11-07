@@ -58,6 +58,8 @@ export interface Settings {
   analytics: boolean;
   /** Also machine-translate teaching text (lessons). Quran, Hadith and Dua texts are never machine-translated. */
   translateContent: boolean;
+  /** Set once the lesson-translation default (on) has been applied, so a later choice is never overridden. */
+  contentInit: boolean;
   /** Speak the translation after each ayah when listening ayah by ayah. */
   translationAudio: boolean;
   /** Play the Arabic recitation of each ayah in the ayah player (at least one of recitation / translation stays on). */
@@ -92,7 +94,7 @@ export const DEFAULTS: Settings = {
   eventsOff: ['3-12', '7-27', '8-15'],
   location: null, savedLocations: [], hijriAdjust: 0,
   translation: 'ur.jalandhry', showTranslation: true, showTranslit: false, arabicSize: 30, transSize: 16,
-  haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: false, translationAuto: true, translationAudio: true, recitationAudio: true, ttsRate: 1, hadithLang: '',
+  haptics: true, sound: true, azkarReminders: false, analytics: false, translateContent: true, contentInit: true, translationAuto: true, translationAudio: true, recitationAudio: true, ttsRate: 1, hadithLang: '',
 };
 
 /**
@@ -115,6 +117,10 @@ export function loadSettings(saved: Record<string, any>): Settings {
     out.notifications = true;
     out.notifyPrayer = DEFAULTS.notifyPrayer;
   }
+  // Lessons are shown in the chosen language by default (with a notice that it is machine translation). Saved settings that
+  // predate this default are switched on once; anyone who chooses "Show original" afterwards keeps that choice.
+  if (!rest['contentInit']) out.translateContent = true;
+  out.contentInit = true;
   out.alertsInit = true;
   return out;
 }

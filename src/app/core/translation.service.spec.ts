@@ -74,6 +74,22 @@ describe('TranslationService', () => {
     localStorage.removeItem('i360.translatorExtra');
   });
 
+  it('does not offer editions with missing ayahs or commentaries, and drops a language left with none', async () => {
+    const data = [
+      { identifier: 'ko.korean', language: 'ko', englishName: 'Korean', direction: 'ltr' },          // 1 ayah missing in the source
+      { identifier: 'id.jalalayn', language: 'id', englishName: 'Jalalayn', direction: 'ltr' },        // tafsir, not a translation
+      { identifier: 'id.indonesian', language: 'id', englishName: 'Indonesian', direction: 'ltr' },
+    ];
+    spyOn(window, 'fetch').and.callFake(async () => new Response(JSON.stringify({ data })));
+    await idbDel('quran:catalog');
+    await ts.loadCatalog();
+    const codes = ts.languages().map(l => l.code);
+    expect(codes).not.toContain('ko');
+    expect(codes).toContain('id');
+    expect(ts.inLanguage('id').map(t => t.id)).toEqual(['id.indonesian']);
+    localStorage.removeItem('i360.translatorExtra');
+  });
+
   it('shows the Quran translation in the app language, until another one is chosen', async () => {
     const data = [{ identifier: 'hi.hindi', language: 'hi', englishName: 'Hindi', direction: 'ltr' }, { identifier: 'fa.ayati', language: 'fa', englishName: 'Ayati', direction: 'rtl' }];
     spyOn(window, 'fetch').and.callFake(async () => new Response(JSON.stringify({ data })));

@@ -86,6 +86,17 @@ const toTranslator = (e: CatalogEdition): Translator => ({
   dir: e.direction === 'rtl' ? 'rtl' : 'ltr', source: 'alquran', sourceLabel: ALQURAN, available: true,
 });
 
+/**
+ * Catalogue editions that are not offered. Each one was checked against the whole Quran (6236 ayahs): the first group has
+ * ayahs that are missing in the source, so showing it would leave gaps; the second group is a commentary (tafsir) with the
+ * verse woven in, not a translation. A language whose only editions are listed here is not offered at all.
+ */
+export const UNSUPPORTED_EDITIONS: ReadonlySet<string> = new Set([
+  'ko.korean', 'ku.asan', 'pt.elhayek', 'sq.mehdiu', 'sq.nahi', 'zh.mazhonggang', 'fa.safavi',
+  'id.jalalayn', 'id.muntakhab', 'ru.muntahab', 'ru.kuliev-alsaadi',
+  'quran-buck',
+]);
+
 /** Short label such as "Fateh Muhammad Jalandhari – Aasan Urdu Translation". */
 export const translatorLabel = (t: Translator) => t.language === 'ur' ? `${t.name.replace('Maulana ', '').replace('Mufti ', '')} – ${t.title}` : `${t.title} – ${t.name}`;
 
@@ -110,7 +121,7 @@ export class TranslationService {
   constructor() {
     // Restore a previously chosen catalogue edition straight away, before the catalogue itself is loaded.
     const saved = lsGet<Translator | null>('i360.translatorExtra', null);
-    if (saved?.id) EXTRA.set(saved.id, saved);
+    if (saved?.id && !UNSUPPORTED_EDITIONS.has(saved.id)) EXTRA.set(saved.id, saved);
     // The catalogue is needed as soon as the app is in a language that may have its own translation.
     effect(() => { if (this.followCode()) untracked(() => void this.loadCatalog()); });
   }
@@ -157,7 +168,7 @@ export class TranslationService {
         } catch (e) { if (!cached) throw e; list = cached.list; }
       }
       const known = new Set(ALL_TRANSLATORS.map(t => t.id));
-      const extra = list.filter(e => e.language !== 'ur' && e.language !== 'ar' && e.identifier && !known.has(e.identifier)).map(toTranslator);
+      const extra = list.filter(e => e.language !== 'ur' && e.language !== 'ar' && e.identifier && !known.has(e.identifier) && !UNSUPPORTED_EDITIONS.has(e.identifier)).map(toTranslator);
       extra.forEach(t => EXTRA.set(t.id, t));
       this.catalog.set(extra);
     } catch { this.catalogError.set(true); }

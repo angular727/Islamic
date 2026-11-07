@@ -4,7 +4,7 @@ import { TranslateService } from './translate.service';
 
 const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 /** Never translated: code, form fields, SVG, and anything marked translate="no" (Quran, Hadith, Dua text, names…). */
-const SKIP = '[translate="no"], .notranslate, script, style, textarea, code, pre, svg, [data-no-i18n], .translit, .urdu, .arabic, .arabic-plain, .trans, .chip.gold, .tp-list, .ncard';
+const SKIP = '[translate="no"], .notranslate, script, style, textarea, code, pre, svg, [data-no-i18n], .translit, .urdu, .arabic, .arabic-plain, .trans, .chip.gold, .tp-list';
 /** Authored teaching text; translated only when the reader switches on "Translate lesson text". */
 const CONTENT = '[data-content]';
 const ARABIC_SCRIPT = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;
@@ -145,7 +145,7 @@ export class DomTranslator implements OnDestroy {
     const core = raw.replace(/\d+(?:[.,:/]\d+)*/g, d => { nums.push(d); return `{${nums.length - 1}}`; });
     if ((core.replace(/\{\d+\}/g, '').match(HAS_LETTER) ?? []).length < 2) return null;   // numbers, times, symbols, single letters
     if (ARABIC_SCRIPT.test(core)) return null;                                   // authored Arabic / Urdu text stays as written
-    if (core.length > 600) return null;                                          // long prose is not machine-translated here
+    if (core.length > 3000) return null;
     return { node, attr, orig, lead: m[1], trail: m[3], core, nums };
   }
 

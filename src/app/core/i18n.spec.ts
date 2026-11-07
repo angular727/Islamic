@@ -176,7 +176,7 @@ describe('DomTranslator', () => {
 
   it('translates lesson text only when the option is on', async () => {
     host.innerHTML = `<p data-content>Teaching text</p><p>Menu text</p>`;
-    const { settings, dom } = await run(() => setup(new FakeProvider()), 'dt5');
+    const { settings, dom } = await run(() => { const r = setup(new FakeProvider()); r.settings.patch({ translateContent: false }); return r; }, 'dt5');
     expect(host.querySelector('[data-content]')!.textContent).toBe('Teaching text');
     expect(host.querySelectorAll('p')[1].textContent).toBe('[dt5] Menu text');
     settings.patch({ translateContent: true });

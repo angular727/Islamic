@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { dl } from '../core/lang-utils';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
+import { desiText, toDesi } from '../core/desi';
 import { EVENTS, HIJRI_MONTHS, monthStart, toGregorian, toHijri } from '../core/hijri';
 import { SettingsService } from '../core/settings.service';
 import { ToastService } from '../core/toast.service';
@@ -20,6 +21,12 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
       <button class="icon-btn" (click)="sheet.set('convert')" aria-label="Converter"><i class="bi bi-arrow-left-right"></i></button>
     </app-header>
     <div class="pad">
+      <div class="card-i p-3 mb-3 tri">
+        <div class="small text-secondary mb-2">{{ (selected() ? 'Selected day' : 'Today') }}</div>
+        @for (r of triple(); track r.label) {
+          <div class="d-flex justify-content-between gap-3 py-1"><span class="text-secondary small">{{ r.label }}</span><span class="fw-semibold text-end">{{ r.value }}</span></div>
+        }
+      </div>
       <div class="card-i p-3">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <button class="icon-btn" (click)="offset.set(offset() - 1)" aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
@@ -45,7 +52,8 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
       @if (selected(); as c) {
         <div class="card-i mt-3">
           <div class="fw-semibold">{{ c.h }} {{ month().name }} {{ month().year }} AH</div>
-          <div class="text-secondary small mb-2">{{ c.greg.toLocaleDateString(dl(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}</div>
+          <div class="text-secondary small">{{ c.greg.toLocaleDateString(dl(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}</div>
+          <div class="text-secondary small mb-2">Desi: {{ desi(c.greg) }}</div>
           @if (c.event) { <div class="chip gold mb-2">{{ c.event }}</div> }
           @for (r of remindersOn(c); track r.id) {
             <div class="d-flex align-items-center small border-top py-2"><i class="bi bi-bell me-2"></i><div class="flex-grow-1">{{ r.title }} · {{ r.time }}</div>
@@ -70,7 +78,7 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
             <div class="grow"><div class="t">{{ e.name }}</div><div class="s">{{ e.date.toLocaleDateString(dl(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) }} · in {{ e.days }} days</div></div></div>
         }
       </div>
-      <div class="text-secondary small mt-3 px-1">Dates follow the Umm al-Qura calendar and may differ by a day from local moon sighting. Adjust in Settings.</div>
+      <div class="text-secondary small mt-3 px-1">Hijri dates follow the Umm al-Qura calendar and may differ by a day from local moon sighting (adjust in Settings). Desi months begin when the sun enters a new sign, about the 14th of each Gregorian month, and may differ by a day between regions.</div>
     </div>
 
     @if (sheet() === 'reminder') {
@@ -86,7 +94,8 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
         <h6>Date converter</h6>
         <label class="small text-secondary">Gregorian → Hijri</label>
         <input class="input-i mb-1" type="date" [(ngModel)]="cvG" (ngModelChange)="g2h()" />
-        <div class="fw-semibold mb-3">{{ cvH }}</div>
+        <div class="fw-semibold">{{ cvH }}</div>
+        <div class="fw-semibold mb-3">{{ cvD }}</div>
         <label class="small text-secondary">Hijri → Gregorian</label>
         <div class="d-flex gap-2 mb-1">
           <input class="input-i" type="number" min="1" max="30" [(ngModel)]="hd" (ngModelChange)="h2g()" placeholder="Day" />
@@ -117,7 +126,19 @@ export class CalendarPage {
   selected = signal<Cell | null>(null);
   sheet = signal<'' | 'reminder' | 'convert'>('');
   rTitle = ''; rDate = ''; rTime = '08:00';
-  cvG = iso(new Date()); cvH = ''; hd = 1; hm = 1; hy = 1447; cvG2 = '';
+  cvG = iso(new Date()); cvH = ''; cvD = '';
+
+  desi(d: Date) { return desiText(toDesi(d)); }
+  /** The same day in the three calendars: Islamic (Hijri), International (Gregorian) and Desi. */
+  triple = computed(() => {
+    const d = this.selected()?.greg ?? new Date();
+    const h = toHijri(d, this.s.s().hijriAdjust);
+    return [
+      { label: 'Islamic (Hijri)', value: `${h.d} ${HIJRI_MONTHS[h.m - 1]} ${h.y} AH` },
+      { label: 'International (Gregorian)', value: d.toLocaleDateString(dl(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) },
+      { label: 'Desi (Punjabi)', value: this.desi(d) },
+    ];
+  }); hd = 1; hm = 1; hy = 1447; cvG2 = '';
 
   private ms = computed(() => monthStart(new Date(), this.offset(), this.s.s().hijriAdjust));
   month = computed(() => ({ name: HIJRI_MONTHS[this.ms().hijri.m - 1], year: this.ms().hijri.y, m: this.ms().hijri.m }));
@@ -171,6 +192,7 @@ export class CalendarPage {
     if (!this.cvG) return;
     const h = toHijri(new Date(this.cvG + 'T12:00:00'), this.s.s().hijriAdjust);
     this.cvH = `${h.d} ${HIJRI_MONTHS[h.m - 1]} ${h.y} AH`;
+    this.cvD = this.desi(new Date(this.cvG + 'T12:00:00'));
   }
   h2g() {
     if (!this.hd || !this.hy) return;
