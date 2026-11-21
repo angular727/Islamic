@@ -32,7 +32,8 @@ import { AyahPlayerService } from '../core/ayah-player.service';
             <button class="chipbtn" (click)="p.cycleSpeed()" [attr.aria-label]="'Speed ' + p.speed + 'x'">{{ p.speed }}x</button>
           </div>
         }
-        @if (p.voiceNote && p.phase() === 'translation' && p.status() !== 'error') { <div class="vnote"><i class="bi bi-info-circle"></i> {{ p.voiceNote }}</div> }
+        @if (p.reader() && p.phase() === 'translation' && p.status() !== 'error') { <div class="vnote"><i class="bi bi-mic"></i> Translation read by {{ p.reader() }}</div> }
+        @else if (p.voiceNote && p.phase() === 'translation' && p.status() !== 'error') { <div class="vnote"><i class="bi bi-info-circle"></i> {{ p.voiceNote }}</div> }
         <div class="d-flex align-items-center justify-content-between">
           <div class="d-flex align-items-center gap-1">
             <button class="ctl" (click)="p.prev()" aria-label="Previous ayah"><i class="bi bi-skip-start-fill"></i></button>

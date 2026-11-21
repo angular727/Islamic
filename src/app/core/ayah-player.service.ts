@@ -3,6 +3,7 @@ import { AudioService } from './audio.service';
 import { PlaybackHub } from './playback-hub';
 import { languageName } from './lang-utils';
 import { SettingsService } from './settings.service';
+import { TRANSLATION_RECORDINGS } from './translation-recordings';
 import { SpeechHandle, TtsService } from './tts.service';
 
 /** What the player needs: the Arabic ayah numbers and the exact translation text shown on screen. */
@@ -10,6 +11,8 @@ export interface PlayerContent {
   surah: number;
   /** ISO code of the translation's language, e.g. "ur". */
   lang: string;
+  /** Id of the translation shown, used to find a human recording of the same translation. */
+  translatorId?: string;
   ayahs: { n: number; global: number; translation: string }[];
 }
 
@@ -52,6 +55,8 @@ export class AyahPlayerService {
   get translationEnabled() { return this.settings.s().translationAudio; }
   get recitationEnabled() { return this.settings.s().recitationAudio; }
   get speed() { return this.settings.s().ttsRate; }
+  /** Name of the reader when the translation is played from a human recording, otherwise ''. */
+  readonly reader = signal('');
   get engine() { return this.tts.engine; }
   get voiceNote() { return this.tts.voiceNote(); }
 
@@ -149,7 +154,7 @@ export class AyahPlayerService {
 
         if (this.translationEnabled) {
           this.phase.set('translation'); this.status.set('loading');
-          await this.playTranslation(a.translation, content.lang, my);
+          await this.playTranslation(a.translation, content.lang, my, i, a.global);
           if (my !== this.generation) return;
         }
       }
@@ -187,7 +192,26 @@ export class AyahPlayerService {
     this.preloaded.set(index + 1, el);
   }
 
-  private async playTranslation(text: string, lang: string, token: number) {
+  /** Plays a recorded translation. Resolves false when the file cannot be loaded, so the spoken voice can take over. */
+  private playRecording(url: string, token: number): Promise<boolean> {
+    return new Promise(resolve => {
+      const el = new Audio(url);
+      el.playbackRate = this.rate;
+      let started = false;
+      const cleanup = () => { el.removeEventListener('ended', ok); el.removeEventListener('error', bad); el.removeEventListener('playing', playing); };
+      const ok = () => { cleanup(); resolve(true); };
+      const bad = () => { cleanup(); resolve(started); };
+      const playing = () => { started = true; if (token === this.generation && this.status() === 'loading') this.status.set('playing'); };
+      el.addEventListener('ended', ok); el.addEventListener('error', bad); el.addEventListener('playing', playing);
+      this.media = { pause: () => el.pause(), resume: () => { el.play().catch(() => {}); }, cancel: () => { cleanup(); el.pause(); el.src = ''; resolve(true); } };
+      el.play().catch(e => { if (e?.name !== 'AbortError') { cleanup(); resolve(false); } });
+    });
+  }
+
+  private async playTranslation(text: string, lang: string, token: number, index: number, global: number) {
+    const rec = this.content?.translatorId ? TRANSLATION_RECORDINGS[this.content.translatorId] : undefined;
+    if (rec && await this.playRecording(rec.url(this.content!.surah, index, global), token)) { this.reader.set(rec.reader); return; }
+    this.reader.set('');   // no recording of this translation (or it could not be loaded): the male voice reads the text
     const handle: SpeechHandle = this.tts.speak(text, lang, this.rate, 'male');
     this.media = handle;
     // The speech engines report "started" only through audio events we cannot see, so show playing right away.

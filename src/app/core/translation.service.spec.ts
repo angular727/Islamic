@@ -30,6 +30,7 @@ describe('TranslationService', () => {
   });
 
   it('defaults to a valid, available translation', () => {
+    settings.patch({ translationAuto: false });
     expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);
     expect(translatorById(DEFAULT_TRANSLATION)?.available).toBeTrue();
   });
@@ -50,6 +51,7 @@ describe('TranslationService', () => {
   });
 
   it('falls back to the default when the saved id is no longer valid', () => {
+    settings.patch({ translationAuto: false });
     settings.patch({ translation: 'ur.dehlvi-abdulqadir' });
     expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);
   });
@@ -100,7 +102,9 @@ describe('TranslationService', () => {
     settings.patch({ lang: 'fa' });
     expect(ts.selectedId()).toBe('fa.ayati');
     settings.patch({ lang: 'en' });
-    expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);                   // English keeps the saved translation
+    expect(ts.selectedId()).toBe('en.sahih');                            // English follows too
+    settings.patch({ lang: 'ur' });
+    expect(ts.selectedId()).toBe(DEFAULT_TRANSLATION);                   // Urdu: the chosen Urdu scholar is kept (default here)
     settings.patch({ lang: 'hi' });
     expect(ts.select('en.sahih')).toBeTrue();                            // an explicit choice wins
     expect(ts.selectedId()).toBe('en.sahih');

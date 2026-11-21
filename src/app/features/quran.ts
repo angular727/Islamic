@@ -358,7 +358,7 @@ export class QuranReaderPage implements OnDestroy {
   private content(): PlayerContent {
     const d = this.data()!;
     return {
-      surah: this.n(), lang: this.ts.selected().language,
+      surah: this.n(), lang: this.ts.selected().language, translatorId: this.ts.selectedId(),
       ayahs: d.arabic.map((a, i) => ({ n: a.numberInSurah, global: a.number, translation: d.translation[i]?.text ?? '' })),
     };
   }

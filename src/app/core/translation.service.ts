@@ -126,22 +126,23 @@ export class TranslationService {
     effect(() => { if (this.followCode()) untracked(() => void this.loadCatalog()); });
   }
 
-  /** The app language when the Quran translation should follow it (not English or Urdu, which keep the saved choice). */
+  /** The app language when the Quran translation should follow it (until the person picks a translation themselves). */
   private followCode = computed(() => {
     const s = this.settings.s(); const code = baseLang(s.lang);
-    return s.translationAuto && code !== 'en' && code !== 'ur' ? code : '';
+    return s.translationAuto ? code : '';
   });
 
   /** The translation chosen automatically for the app language, if the catalogue has one. */
   readonly autoPick = computed(() => {
     const c = this.followCode(); if (!c) return undefined;
+    if (c === 'ur') { const saved = translatorById(this.settings.s().translation); return saved?.language === 'ur' && saved.available ? undefined : translatorById(DEFAULT_TRANSLATION); }   // keep the chosen Urdu scholar
     // Keep the same scholar when that scholar's own translation exists in the app language.
     const key = this.scholarKeyOf(this.settings.s().translation);
     return (key ? this.scholarLanguages(key).find(t => t.language === c) : undefined) ?? this.inLanguage(c)[0];
   });
   private scholarKeyOf(id: string) { const t = translatorById(id); const k = t?.scholar ?? t?.id ?? ''; return URDU_TRANSLATORS.some(u => u.id === k) ? k : ''; }
   /** True when the app language has translations, so "follow the app language" can be offered. */
-  readonly appLanguageHasTranslation = computed(() => { const c = baseLang(this.settings.s().lang); return c !== 'en' && c !== 'ur' && this.inLanguage(c).length > 0; });
+  readonly appLanguageHasTranslation = computed(() => { const c = baseLang(this.settings.s().lang); return c !== 'ur' && this.inLanguage(c).length > 0; });
   readonly following = computed(() => !!this.autoPick());
 
   /** Go back to showing the translation in the app's language. */
